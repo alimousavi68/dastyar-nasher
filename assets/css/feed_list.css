@@ -1,0 +1,226 @@
+/* Include Fonts  */
+
+@font-face {
+    font-family: IRANSansX;
+    font-style: normal;
+    font-weight: bold;
+    src: url('../fonts/Woff/IRANSansXFaNum-Bold.woff') format('woff'),
+        url('../fonts/Woff2/IRANSansXFaNum-Bold.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: IRANSansX;
+    font-style: normal;
+    font-weight: normal;
+    src: url('../fonts/Woff/IRANSansXFaNum-Regular.woff') format('woff'),
+        url('../fonts/Woff2/IRANSansXFaNum-Regular.woff2') format('woff2');
+}
+
+/* General Style */
+body,
+.tooltip-inner {
+    font-family: 'IRANSansX', sans-serif !important;
+    -moz-font-feature-settings: "ss01";
+    -webkit-font-feature-settings: "ss01";
+    font-feature-settings: "ss01";
+}
+
+a {
+    text-decoration: none !important;
+    color: rgb(18, 18, 18);
+}
+
+
+/* Top Filter box style */
+/* برای دسکتاپ */
+.flex-container {
+    display: flex;
+    flex-wrap: nowrap;
+    /* برای دسکتاپ */
+    width: 100%;
+}
+
+.box1 {
+    flex: 0 0 3.33%;
+    /* 1 از 12 */
+}
+
+.box2 {
+    flex: 1;
+    /* باقی‌مانده */
+}
+
+.box3 {
+    flex: 0 0 4.33%;
+    /* 1 از 12 */
+}
+
+/* برای موبایل و تبلت */
+@media (max-width: 768px) {
+    .flex-container {
+        flex-wrap: wrap;
+        /* برای موبایل */
+    }
+
+    .box1 {
+        order: 1;
+        /* جابجایی به سمت راست */
+        flex: 0 0 50%;
+        /* 50% عرض */
+    }
+
+    .box2 {
+        order: 3;
+        /* در بالای Box 1 و Box 3 */
+        flex: 0 0 100%;
+        /* تمام عرض */
+    }
+
+    .box3 {
+        order: 2;
+        /* جابجایی به سمت چپ */
+        flex: 0 0 50%;
+        /* 50% عرض */
+    }
+
+    .pub_time,
+    .resource_name,
+    .resource_cat {
+        font-size: 13px !important;
+        color: var(--bs-secondary) !important;
+    }
+
+    .item_counter {
+        min-width: 20px !important;
+        text-align: right;
+        padding-left: 5px;
+        font-size: 12px;
+        color: var(--bs-secondary);
+    }
+}
+
+
+
+/* Select2 Style */
+.select2-container--default .select2-selection--multiple {
+    overflow-y: auto;
+    height: 58px;
+    max-height: 58px;
+}
+
+.select2-container--default .select2-results>.select2-results__options {
+    max-height: 100vh !important;
+}
+
+.item_counter {
+    min-width: 35px;
+    text-align: right;
+    padding-left: 5px;
+}
+
+
+.select2-container--default.select2-container--focus .select2-selection--multiple,
+.select2-container--default .select2-selection--multiple {
+    border: solid var(--bs-border-color) 1px !important;
+    border-radius: 0 !important;
+}
+
+
+
+
+
+/* Paginations Style  */
+
+ul.page-numbers {
+    display: flex;
+    padding: 0px;
+    margin: 0px;
+    list-style: none;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+    color: var(--bs-primary);
+    overflow: hidden;
+ }
+ ul.page-numbers li>a, ul.page-numbers li>span {
+    width: 20px;
+    border-right: 1px solid var(--bs-border-color);
+    border-left: 1px solid var(--bs-border-color);
+    margin: 0;
+    min-width: 50px;
+    height: 50px;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    padding: 8px;
+    width: fit-content;
+    color: var(--bs-primary);
+}
+ul.page-numbers li {
+    margin: 0;
+}
+ul.page-numbers li span.page-numbers.current {
+    background-color: var(--bs-primary);
+    color: white;
+    border-color: var(--bs-primary);
+}
+ul.page-numbers li>a:hover {
+    background-color: #a5a5a5;
+    color: white;
+}
+
+
+
+
+/* My Custom Table of Items Style - Feeds */
+.table-item:hover {
+    background-color: #eeeff5;
+}
+
+.scraped-feeds-table .tr:hover {
+    background-color: #eaf9ff;
+}
+
+/*  List items Animation Load Style */
+@keyframes blink {
+    0% {
+        background-color: #f0f0f1;
+    }
+
+    50% {
+        background-color: gold;
+    }
+
+    100% {
+        background-color: #f0f0f1;
+    }
+}
+
+.blinking {
+    animation: blink 2s infinite;
+    filter: blur(1.2px);
+}
+
+
+.form-floating>.form-select~label {
+    color: rgba(var(--bs-body-color-rgb), .65);
+    transform: scale(.73) translateY(-.5rem) translateX(-.15rem);
+    color: #A6A6A6;
+}
+
+
+@media(min-width:760px) {
+    .border-lg-1 {
+        border: 1px solid var(--bs-border-color);
+    }
+}
+
+
+/* Enable Bootstarp Custom Tooltip */
+.custom-tooltip {
+    --bs-tooltip-bg: var(--bs-primary);
+    --bs-tooltip-color: var(--bs-white);
+}
+
+
+
