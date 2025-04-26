@@ -417,7 +417,7 @@ function pc_schedule_queue_page_callback()
                                 </div>
                             </div>
                         </div>
-                <?php‍
+                <?php
 
                     endforeach;
                 endif;
