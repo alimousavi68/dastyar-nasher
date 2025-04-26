@@ -250,7 +250,7 @@ function pc_schedule_queue_page_callback()
 
                                         $timestamp = $scheduled_date->getTimestamp();
 
-                                        // date_default_timezone_set(timezoneId: 'Asia/Tehran');
+                                        date_default_timezone_set(timezoneId: 'Asia/Tehran');
                                         echo '⏰ اجرای بعدی: ' . date('H:i:s - Y/m/d', $timestamp);
                                     } else {
                                         echo '❌ هیچ اجرای برنامه‌ریزی‌شده‌ای برای این هوک پیدا نشد.';
@@ -338,7 +338,7 @@ function pc_schedule_queue_page_callback()
                                 </div>
                                 <div class="col-4 col-xl-1 bg-transparent text-secondary item-meta-data">
                                     <?php
-                                    // date_default_timezone_set(timezoneId: 'Asia/Tehran');
+                                    date_default_timezone_set(timezoneId: 'Asia/Tehran');
                                     if ($counter >= 1) {
                                         $step = ($recurrence * $counter);
                                         echo date('H:i:s - Y/m/d', ($timestamp + $step)) . '<br>';
@@ -417,7 +417,7 @@ function pc_schedule_queue_page_callback()
                                 </div>
                             </div>
                         </div>
-                <?php
+                <?php‍
 
                     endforeach;
                 endif;
