@@ -156,10 +156,10 @@ add_action( 'i8_action_publish_post_at_scheduling_table', 'publish_post_at_sched
 function publish_post_at_scheduling_table()
 {
     // date_default_timezone_set(timezoneId: 'Asia/Tehran');
-    error_log('i8_action_publish_post_at_scheduling_table RUNNING- ' . date('Y-m-d H:i:s'));
+    error_log('i8_action_publish_post_at_scheduling_table RUNNING- ' . ' current time: ' . date('Y-m-d H:i:s') .' start_cron_time: ' . get_option('start_cron_time') . ' end_cron_time: ' . get_option('end_cron_time'));
 
     // //error_log('publish_post_at_scheduling_table RUNNING');
-    // date_default_timezone_set('Asia/Tehran');
+    date_default_timezone_set('Asia/Tehran');
     $start_time = strtotime(get_option('start_cron_time'));
     $end_time = strtotime(get_option('end_cron_time'));
 
@@ -183,6 +183,9 @@ function publish_post_at_scheduling_table()
             }
 
         }
+    }
+    else {
+        error_log('i8 Out Of Work Time - NOT RUNNING: ' . ' current time: ' . date('Y-m-d H:i:s') .' start_cron_time: ' . get_option('start_cron_time') . ' end_cron_time: ' . get_option('end_cron_time'));
     }
 }
 

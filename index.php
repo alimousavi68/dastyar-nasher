@@ -45,5 +45,5 @@ include_once (plugin_dir_path(__FILE__) . '/inc/report/index.php');
 
 include_once (plugin_dir_path(__FILE__) . '/inc/db.php');
 
-// include_once (plugin_dir_path(__FILE__) . '/inc/crons/crons.php');
+include_once (plugin_dir_path(__FILE__) . '/inc/crons/crons.php');
 // include_once (plugin_dir_path(__FILE__) . '/inc/crons/scheduling_post_publishing.php');
