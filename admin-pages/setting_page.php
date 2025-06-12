@@ -6,7 +6,7 @@ $wp_load_path = get_home_path() . 'wp-load.php';
 if (file_exists($wp_load_path)) {
     require_once ($wp_load_path);
 } else {
-    // //error_log('wp-load.php not found!');
+   
     exit;
 }
 
@@ -167,41 +167,58 @@ function news_interval_callback()
 {
     $news_interval_start = get_option('news_interval_start');
     $news_interval_end = get_option('news_interval_end');
+    $start_cron_time = get_option('start_cron_time');
+    $end_cron_time = get_option('end_cron_time');
+    $max_daily_post = get_option('daily_post_count_for_schedule');
+    $next_run_time = get_option('i8_next_run_time');
+    $now = current_time('timestamp');
+    $now_str = date_i18n('Y-m-d H:i:s', $now);
+    $start_parts = explode(':', $start_cron_time);
+    $end_parts = explode(':', $end_cron_time);
+    $start_seconds = isset($start_parts[0], $start_parts[1]) ? ($start_parts[0] * 3600 + $start_parts[1] * 60) : 0;
+    $end_seconds = isset($end_parts[0], $end_parts[1]) ? ($end_parts[0] * 3600 + $end_parts[1] * 60) : 0;
+    $interval = ($end_seconds <= $start_seconds) ? (24*3600 - $start_seconds + $end_seconds) : ($end_seconds - $start_seconds);
+    $interval_hours = round($interval/3600, 2);
+    $max_daily_post = $max_daily_post ? $max_daily_post : max($news_interval_start, $news_interval_end);
+    $post_interval = ($interval_hours > 0 && $max_daily_post > 0) ? round(($interval_hours*60)/$max_daily_post, 2) : 0;
+    // محاسبه زمان اجرای بعدی کرون با توجه به ساعت کاری
+    $next_run_str = '';
+    if ($next_run_time) {
+        $next_run_time_int = intval($next_run_time);
+        $next_run_str = date_i18n('Y-m-d H:i:s', $next_run_time_int);
+        // اگر زمان اجرای بعدی خارج از بازه کاری است، زمان شروع بعدی را پیدا کن
+        $today = date('Y-m-d', $now);
+        $start_today = strtotime($today . ' ' . $start_cron_time);
+        $end_today = strtotime($today . ' ' . $end_cron_time);
+        if ($end_today <= $start_today) $end_today += 86400;
+        if ($next_run_time_int < $start_today || $next_run_time_int > $end_today) {
+            // اجرای بعدی در اولین دوره بعدی شروع ساعت کاری
+            if ($now < $start_today) {
+                $next_run_str = date_i18n('Y-m-d H:i:s', $start_today);
+            } else {
+                $next_start = $start_today + 86400;
+                $next_run_str = date_i18n('Y-m-d H:i:s', $next_start);
+            }
+        }
+    }
     echo '<input type="number" name="news_interval_start" value="' . esc_attr($news_interval_start) . '" /> - <input type="number" name="news_interval_end" value="' . esc_attr($news_interval_end) . '" /><br>';
-    ?>
-    <div class="i8-flex-column " style="padding:10px 5px;border:1px solid #ccc; margin: 10px 0;">
-        <span>
-            <span>زمان اجرای بعدی:</span>
-            <span><?php
-            date_default_timezone_set('Asia/Tehran');
-            $i8_next_run_time = get_option('i8_next_run_time');
-            echo date('H:i:s - Y/m/d ', $i8_next_run_time);
-            ?></span>
-        </span>
-        <p>
-            <span>
-                تعداد خبرهای امروز:
-            </span>
-            <span>
-                <?php
-                echo (get_option('daily_post_count_for_schedule')) ? get_option('daily_post_count_for_schedule') : '-';
-                ?>
-            </span>
-        </p>
-        <p>
-            <span>
-                فاصله انتشار از صف:
-            </span>
-            <span>
-                <?php
-                // // $interval = calculate_post_publishing_schedule();
-                // $interval = ($interval) ? floor($interval / 60) : 0;
-                // echo 'بین ' . $interval . ' تا ' . ($interval + 5) . ' دقیقه';
-                ?>
-            </span>
-        </p>
-    </div>
-    <?php
+    echo '<div class="i8-flex-column" style="padding:10px 5px;border:1px solid #ccc; margin: 10px 0; direction:rtl; text-align:right; background:#f9f9f9;">';
+    echo '<b>ساعت شروع کار ربات:</b> <span style="color:#007bff">' . esc_html($start_cron_time) . '</span> <b>ساعت پایان:</b> <span style="color:#007bff">' . esc_html($end_cron_time) . '</span><br>';
+    echo '<b>حداکثر تعداد پست برای انتشار:</b> <span style="color:#28a745">' . esc_html($max_daily_post) . '</span><br>';
+    echo '<b>زمان اجرای بعدی کرون جاب:</b> <span style="color:#e67e22">' . esc_html($next_run_str) . '</span><br>';
+    echo '<b>نحوه محاسبه ساعت کاری و فواصل انتشار:</b><br>';
+    echo '<span style="display:inline-block;padding:4px 8px;background:#e3e3e3;border-radius:6px;margin:4px 0;">'
+        . 'ساعت کاری: '
+        . esc_html($start_cron_time) . ' '
+        . '<span style="color:#888">تا</span> '
+        . esc_html($end_cron_time) . ' '
+        . '(<span style="color:#007bff">' . $interval_hours . ' ساعت</span>)'
+        . ' | '
+        . 'حداکثر پست: <span style="color:#28a745">' . esc_html($max_daily_post) . '</span>'
+        . ' | '
+        . 'فاصله انتشار: <span style="color:#e67e22">' . $post_interval . ' دقیقه</span>'
+        . '</span>';
+    echo '</div>';
 }
 
 // فراخوانی تابع افزودن صفحه تنظیمات

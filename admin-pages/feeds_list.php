@@ -6,7 +6,6 @@ $wp_load_path = get_home_path() . 'wp-load.php';
 if (file_exists($wp_load_path)) {
     require_once($wp_load_path);
 } else {
-    // //error_log('wp-load.php not found!');
     exit;
 }
 
@@ -118,7 +117,7 @@ function publisher_copoilot_callback()
 
                     
                     ?>
-                    <form action="<?php echo get_full_url() ; //error_log('reffer site:' . print_r($_SERVER) ); ?>" method="post">
+                    <form action="<?php echo get_full_url() ; ?>" method="post">
                         <!-- serach input -->
                         <div class="input-group">
 

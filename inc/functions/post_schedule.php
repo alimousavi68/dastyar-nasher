@@ -136,20 +136,41 @@ function calculate_post_publish_time()
     $post_publisher_start_time = get_option('start_cron_time') ? get_option('start_cron_time') : '';
     $post_publisher_end_time = get_option('end_cron_time') ? get_option('end_cron_time') : '';
 
-    // $post_publisher_start_work_time = get_option('news_interval_start') ? get_option('news_interval_start') : '30';
-    $post_publisher_daily_post_count = get_option('news_interval_end') ? get_option('news_interval_end') : '30';
+    $news_interval_start = get_option('news_interval_start') ? get_option('news_interval_start') : '30';
+    $news_interval_end =   get_option('news_interval_end') ? get_option('news_interval_end') : '40';
+    $post_publisher_daily_post_count = rand($news_interval_start,$news_interval_end);
 
-    $post_publishe_count = get_option('daily_post_count_for_schedule') ? get_option('daily_post_count_for_schedule') : '10';
+    $post_publishe_count = get_option('daily_post_count_for_schedule') ? get_option('daily_post_count_for_schedule') : '60';
 
-    $interval = $post_publisher_end_time - $post_publisher_start_time;
+    // تبدیل ساعت شروع و پایان به ثانیه از ابتدای روز
+    $start_parts = explode(':', $post_publisher_start_time);
+    $end_parts = explode(':', $post_publisher_end_time);
+    $start_seconds = isset($start_parts[0], $start_parts[1]) ? ($start_parts[0] * 3600 + $start_parts[1] * 60) : 0;
+    $end_seconds = isset($end_parts[0], $end_parts[1]) ? ($end_parts[0] * 3600 + $end_parts[1] * 60) : 0;
+
+    // اگر ساعت پایان کمتر از شروع بود، یعنی بازه تا روز بعد ادامه دارد
+    if ($end_seconds <= $start_seconds) {
+        $interval = (24 * 3600 - $start_seconds) + $end_seconds;
+    } else {
+        $interval = $end_seconds - $start_seconds;
+    }
     if ($interval <= 0) {
         $interval = 1; // جلوگیری از تقسیم بر صفر یا زمان منفی
     }
 
-    $post_per_hours = ($post_publisher_daily_post_count / $interval);
+    $post_per_hours = ($post_publisher_daily_post_count / ($interval / 3600));
     $post_publishe_interval_time = (ceil(60 / $post_per_hours))*60;
+
+    error_log('i8_calculate_post_publish_time DEBUG - start_cron_time: ' . $post_publisher_start_time . ' end_cron_time: ' . $post_publisher_end_time);
+    error_log('i8_calculate_post_publish_time DEBUG - start_seconds: ' . $start_seconds . ' end_seconds: ' . $end_seconds);
+    error_log('i8_calculate_post_publish_time DEBUG - calculated interval (seconds): ' . $interval);
+    error_log('i8_calculate_post_publish_time DEBUG - post_publishe_count: ' . $post_publishe_count);
+    error_log('i8_calculate_post_publish_time DEBUG - post_per_hours: ' . $post_per_hours);
+    error_log('i8_calculate_post_publish_time DEBUG - post_publishe_interval_time (seconds): ' . $post_publishe_interval_time);
+
     return $post_publishe_interval_time;
 }
+
 
 // Hook to handle the scheduled event
 add_action( 'i8_action_publish_post_at_scheduling_table', 'publish_post_at_scheduling_table' );
@@ -160,20 +181,37 @@ function publish_post_at_scheduling_table()
 
     // //error_log('publish_post_at_scheduling_table RUNNING');
     date_default_timezone_set('Asia/Tehran');
-    $start_time = strtotime(get_option('start_cron_time'));
-    $end_time = strtotime(get_option('end_cron_time'));
+    $start_time_str = get_option('start_cron_time');
+    $end_time_str = get_option('end_cron_time');
+    $now = time();
+    $today = date('Y-m-d');
+    $start_time = strtotime($today . ' ' . $start_time_str);
+    $end_time_candidate = strtotime($today . ' ' . $end_time_str);
 
+    // اگر ساعت پایان کمتر از ساعت شروع بود، یعنی بازه تا روز بعد ادامه دارد
+    if ($end_time_candidate <= $start_time) {
+        $end_time = $end_time_candidate + 86400; // اضافه کردن یک روز به ساعت پایان
+    } else {
+        $end_time = $end_time_candidate;
+    }
+
+    error_log('i8_action_publish_post_at_scheduling_table DEBUG - start_time: ' . date('Y-m-d H:i:s', $start_time) . ' end_time: ' . date('Y-m-d H:i:s', $end_time) . ' now: ' . date('Y-m-d H:i:s', $now));
+
+    $in_work_time = ($now >= $start_time && $now <= $end_time);
+    error_log('i8_action_publish_post_at_scheduling_table DEBUG - in_work_time: ' . ($in_work_time ? 'true' : 'false'));
     // تنظیم محدوده زمانی
-    if (time() >= $start_time && time() <= $end_time) {
+    if (!$in_work_time) {
+        error_log('i8_action_publish_post_at_scheduling_table - Not in work time, returning.');
+        return; // Stop execution if not in work time
+    }
 
+    if ($in_work_time) {
         global $wpdb;
         $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
         if ($wpdb->get_var("SHOW TABLES LIKE '$table_post_schedule'") == $table_post_schedule) {
-
             $high_priority_posts = $wpdb->get_results("SELECT * FROM $table_post_schedule WHERE publish_priority = 'high' ORDER BY id ASC LIMIT 1");
             $medium_priority_posts = $wpdb->get_results("SELECT * FROM $table_post_schedule WHERE publish_priority = 'medium' ORDER BY id ASC LIMIT 1");
             $low_priority_posts = $wpdb->get_results("SELECT * FROM $table_post_schedule WHERE publish_priority = 'low' ORDER BY id ASC LIMIT 1");
-
             if ($high_priority_posts) {
                 i8_change_post_status($high_priority_posts);
             } elseif ($medium_priority_posts) {
@@ -181,7 +219,6 @@ function publish_post_at_scheduling_table()
             } elseif ($low_priority_posts) {
                 i8_change_post_status($low_priority_posts);
             }
-
         }
     }
     else {

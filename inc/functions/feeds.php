@@ -16,7 +16,21 @@ function fetch_rss_feed($url)
     }
 
     $body = wp_remote_retrieve_body($response);
+
+    // Suppress errors and capture them manually
+    libxml_use_internal_errors(true);
     $rss_feed = simplexml_load_string($body);
+
+    if ($rss_feed === false) {
+        $errors = libxml_get_errors();
+        foreach ($errors as $error) {
+            // error_log('i8_feeds_error: XML Parsing Error: ' . $error->message . ' in ' . $error->file . ' on line ' . $error->line);
+        }
+        // error_log('i8_feeds_error: Raw body content that caused error: ' . $body);
+        libxml_clear_errors();
+        return false;
+    }
+    libxml_use_internal_errors(false);
     // $report_id = insert_rss_report(
     //     'درخواست واکشی فید های یک منبع',
     //     $url,

@@ -6,7 +6,6 @@ $wp_load_path = get_home_path() . 'wp-load.php';
 if (file_exists($wp_load_path)) {
     require_once ($wp_load_path);
 } else {
-    //error_log('wp-load.php not found!');
     exit;
 }
 
