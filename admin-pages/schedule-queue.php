@@ -437,7 +437,7 @@ function pc_schedule_queue_page_callback()
                                 </div>
                                 <div class="col-4 col-xl-1 bg-transparent text-secondary item-meta-data">
                                     <?php
-                                    date_default_timezone_set(timezoneId: 'Asia/Tehran');
+                                    date_default_timezone_set( 'Asia/Tehran');
                                     $post_scheduled_timestamp = $timestamp;
                                     if ($counter >= 1) {
                                         $step = ($recurrence_seconds * $counter);
