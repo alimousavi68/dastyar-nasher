@@ -281,7 +281,7 @@ function pc_schedule_queue_page_callback()
                                         }
                                         $scheduled_date = $schedule->get_date();
                                         $timestamp = $scheduled_date->getTimestamp();
-                                        date_default_timezone_set(timezoneId: 'Asia/Tehran');
+                                        date_default_timezone_set( 'Asia/Tehran');
 
                                         // Get cron working hours
                                         $start_cron_time = get_option('start_cron_time');
