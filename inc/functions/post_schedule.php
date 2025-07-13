@@ -196,8 +196,16 @@ function publish_post_at_scheduling_table()
     }
 
     error_log('i8_action_publish_post_at_scheduling_table DEBUG - start_time: ' . date('Y-m-d H:i:s', $start_time) . ' end_time: ' . date('Y-m-d H:i:s', $end_time) . ' now: ' . date('Y-m-d H:i:s', $now));
-
-    $in_work_time = ($now >= $start_time && $now <= $end_time);
+    
+    // بررسی اینکه آیا زمان فعلی در محدوده زمان کاری است
+    // اگر ساعت پایان کمتر از ساعت شروع باشد (مثلاً 22:00 تا 06:00)، باید شرایط خاصی را بررسی کنیم
+    if ($end_time_candidate <= $start_time) {
+        // در این حالت، یا زمان فعلی بعد از ساعت شروع است یا قبل از ساعت پایان روز بعد
+        $in_work_time = ($now >= $start_time || $now <= $end_time);
+    } else {
+        // در حالت عادی، زمان فعلی باید بین ساعت شروع و پایان باشد
+        $in_work_time = ($now >= $start_time && $now <= $end_time);
+    }
     error_log('i8_action_publish_post_at_scheduling_table DEBUG - in_work_time: ' . ($in_work_time ? 'true' : 'false'));
     // تنظیم محدوده زمانی
     if (!$in_work_time) {
