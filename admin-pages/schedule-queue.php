@@ -1,13 +1,13 @@
 <?php
 
-require_once ABSPATH . 'wp-admin/includes/file.php';
-$wp_load_path = get_home_path() . 'wp-load.php';
-
-if (file_exists($wp_load_path)) {
-    require_once($wp_load_path);
-} else {
-    
+// Prevent direct access
+if (!defined('ABSPATH')) {
     exit;
+}
+
+// Ensure WordPress functions are available
+if (!function_exists('add_action')) {
+    return;
 }
 
 
@@ -24,19 +24,62 @@ function publisher_copoilot_schedule_queue_page_callback()
 
 
 // فراخوانی تابع افزودن صفحه تنظیمات
-add_action('admin_menu', 'i8_add_scheduleـqueue_page_menu');
+if (function_exists('add_action')) {
+    add_action('admin_menu', 'i8_add_scheduleـqueue_page_menu');
+}
 
 // تابع برای اضافه کردن صفحه تنظیمات
 function i8_add_scheduleـqueue_page_menu()
 {
-    add_submenu_page(
-        'publisher_copoilot',
-        'صف انتشار',
-        'صف انتشار',
-        'publish_posts',
-        'publisher_copoilot_schedule_queue',
-        'pc_schedule_queue_page_callback'
-    );
+    if (function_exists('add_submenu_page')) {
+        add_submenu_page(
+            'publisher_copoilot',
+            'صف انتشار',
+            'صف انتشار',
+            'publish_posts',
+            'publisher_copoilot_schedule_queue',
+            'pc_schedule_queue_page_callback'
+        );
+    }
+}
+
+// Helper functions for safe WordPress function calls
+function safe_get_option($option_name, $default = '') {
+    return function_exists('get_option') ? get_option($option_name, $default) : $default;
+}
+
+function safe_esc_attr($text) {
+    return function_exists('esc_attr') ? esc_attr($text) : htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+}
+
+function safe_esc_html($text) {
+    return function_exists('esc_html') ? esc_html($text) : htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+}
+
+function safe_get_edit_post_link($post_id) {
+    return function_exists('get_edit_post_link') ? get_edit_post_link($post_id) : '#';
+}
+
+function safe_get_the_title($post_id) {
+    return function_exists('get_the_title') ? get_the_title($post_id) : 'عنوان پست';
+}
+
+function safe_get_post_status($post_id) {
+    return function_exists('get_post_status') ? get_post_status($post_id) : 'unknown';
+}
+
+function safe_get_permalink($post_id) {
+    return function_exists('get_permalink') ? get_permalink($post_id) : '#';
+}
+
+function safe_get_author_name($post_id) {
+    if (function_exists('get_the_author_meta') && function_exists('get_post_field')) {
+        $author_id = get_post_field('post_author', $post_id);
+        if ($author_id) {
+            return get_the_author_meta('display_name', $author_id) ?: 'نامشخص';
+        }
+    }
+    return 'نامشخص';
 }
 
 function post_priority_persian($priority)
@@ -260,91 +303,127 @@ function pc_schedule_queue_page_callback()
                     <span>
                         <span>⏰  اجرای بعدی: </span>
                         <span><?php
-                                require_once(COP_PLUGIN_DIR_PATH . '/library/jdatetime.class.php');
-                                $recurrence = '-'; // Initialize recurrence
-                                $recurrence_seconds = 0; // Initialize recurrence_seconds
-                                if (function_exists('as_next_scheduled_action')) {
-                                    $actions = as_get_scheduled_actions([
-                                        'hook'     => 'i8_action_publish_post_at_scheduling_table',
-                                        'status'   => ActionScheduler_Store::STATUS_PENDING,
-                                        'per_page' => 1,
-                                        'orderby'  => 'scheduled_date',
-                                        'order'    => 'ASC',
-                                    ]);
-                                    if (!empty($actions)) {
-                                        $action_id = array_key_first($actions);
-                                        $action = ActionScheduler::store()->fetch_action($action_id);
-                                        $schedule = $action->get_schedule();
-                                        $recurrence_seconds = $schedule->get_recurrence();
-                                        if ($recurrence_seconds) {
-                                            $recurrence = 'هر ' . ($recurrence_seconds / 60) . ' دقیقه';
+                                try {
+                                    if (file_exists(COP_PLUGIN_DIR_PATH . '/library/jdatetime.class.php')) {
+                                        require_once(COP_PLUGIN_DIR_PATH . '/library/jdatetime.class.php');
+                                    }
+                                    
+                                    $recurrence = '-'; // Initialize recurrence
+                                    $recurrence_seconds = 0; // Initialize recurrence_seconds
+                                    $timestamp = null; // Initialize timestamp
+                                    
+                                    if (function_exists('as_next_scheduled_action')) {
+                                        $actions = as_get_scheduled_actions([
+                                            'hook'     => 'i8_action_publish_post_at_scheduling_table',
+                                            'status'   => ActionScheduler_Store::STATUS_PENDING,
+                                            'per_page' => 1,
+                                            'orderby'  => 'scheduled_date',
+                                            'order'    => 'ASC',
+                                        ]);
+                                        
+                                        if (!empty($actions)) {
+                                            $action_id = array_key_first($actions);
+                                            $action = ActionScheduler::store()->fetch_action($action_id);
+                                            
+                                            if ($action) {
+                                                $schedule = $action->get_schedule();
+                                                
+                                                if ($schedule && is_object($schedule)) {
+                                     try {
+                                         if (method_exists($schedule, 'get_recurrence')) {
+                                             $recurrence_seconds = $schedule->get_recurrence();
+                                             if ($recurrence_seconds) {
+                                                 $recurrence = 'هر ' . ($recurrence_seconds / 60) . ' دقیقه';
+                                             }
+                                         }
+                                     } catch (Exception $e) {
+                                         // Ignore method call errors
+                                     }
+                                 }
+                                 
+                                 if ($schedule && is_object($schedule)) {
+                                     try {
+                                         if (method_exists($schedule, 'get_date')) {
+                                             $scheduled_date = $schedule->get_date();
+                                             if ($scheduled_date && is_object($scheduled_date) && method_exists($scheduled_date, 'getTimestamp')) {
+                                                 $timestamp = $scheduled_date->getTimestamp();
+                                                 date_default_timezone_set('Asia/Tehran');
+                                             }
+                                         }
+                                     } catch (Exception $e) {
+                                         // Ignore method call errors
+                                     }
+                                 }
+                                            }
                                         }
-                                        $scheduled_date = $schedule->get_date();
-                                        $timestamp = $scheduled_date->getTimestamp();
-                                        date_default_timezone_set( 'Asia/Tehran');
+                                        
+                                        if ($timestamp) {
+                                            // Get cron working hours
+                            $start_cron_time = safe_get_option('start_cron_time');
+                             $end_cron_time = safe_get_option('end_cron_time');
 
-                                        // Get cron working hours
-                                        $start_cron_time = get_option('start_cron_time');
-                                        $end_cron_time = get_option('end_cron_time');
+                                            // Adjust timestamp based on working hours
+                                            if ($start_cron_time && $end_cron_time) {
+                                                $today = date('Y-m-d', $timestamp);
+                                                $start_today_timestamp = strtotime($today . ' ' . $start_cron_time);
+                                                $end_today_timestamp = strtotime($today . ' ' . $end_cron_time);
 
-                                        // Adjust timestamp based on working hours, similar to setting_page.php
-                                        if ($start_cron_time && $end_cron_time) {
-                                            $today = date('Y-m-d', $timestamp);
-                                            $start_today_timestamp = strtotime($today . ' ' . $start_cron_time);
-                                            $end_today_timestamp = strtotime($today . ' ' . $end_cron_time);
+                                                // Handle overnight working hours (e.g., 22:00 to 06:00)
+                                                if ($end_today_timestamp <= $start_today_timestamp) {
+                                                    if ($timestamp >= $start_today_timestamp) {
+                                                        $end_today_timestamp += 86400;
+                                                    } else {
+                                                        $start_today_timestamp -= 86400;
+                                                    }
+                                                }
 
-                                            // Handle overnight working hours (e.g., 22:00 to 06:00)
-                                            if ($end_today_timestamp <= $start_today_timestamp) {
-                                                if ($timestamp >= $start_today_timestamp) {
-                                                    // If current timestamp is after start time on the same day (e.g., 23:00 for 22:00-06:00)
-                                                    $end_today_timestamp += 86400; // Add 24 hours to end time
-                                                } else {
-                                                    // If current timestamp is before end time on the same day (e.g., 05:00 for 22:00-06:00)
-                                                    $start_today_timestamp -= 86400; // Subtract 24 hours from start time
+                                                if ($timestamp < $start_today_timestamp) {
+                                                    $timestamp = $start_today_timestamp;
+                                                } elseif ($timestamp > $end_today_timestamp) {
+                                                    $timestamp = $start_today_timestamp + 86400;
                                                 }
                                             }
 
-                                            if ($timestamp < $start_today_timestamp) {
-                                                // If scheduled time is before working hours, set to start of working hours today
-                                                $timestamp = $start_today_timestamp;
-                                            } elseif ($timestamp > $end_today_timestamp) {
-                                                // If scheduled time is after working hours, set to start of working hours tomorrow
-                                                $timestamp = $start_today_timestamp + 86400; // Add 24 hours to start time for next day
+                                            // Check if jDateTime class exists before using it
+                                            if (class_exists('i8_jDateTime')) {
+                                                $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
+                                                $jalali_date = $jdate->date('Y/m/d H:i:s', $timestamp);
+
+                                                $today_gregorian = date('Y-m-d');
+                                                $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
+                                                $scheduled_day_gregorian = date('Y-m-d', $timestamp);
+
+                                                $display_date = '';
+                                                if ($scheduled_day_gregorian == $today_gregorian) {
+                                                    $display_date = 'امروز ساعت ' . $jdate->date('H:i', $timestamp);
+                                                } elseif ($scheduled_day_gregorian == $tomorrow_gregorian) {
+                                                    $display_date = 'فردا ساعت ' . $jdate->date('H:i', $timestamp);
+                                                } else {
+                                                    $display_date = $jdate->date('Y/m/d H:i', $timestamp);
+                                                }
+                                                echo '<span title="' . safe_esc_attr($jalali_date) . '">' . $display_date . '</span>';
+                                            } else {
+                                                // Fallback to Gregorian date if jDateTime class is not available
+                                                echo date('Y-m-d H:i', $timestamp);
                                             }
-                                        }
-
-                                        $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
-                                        $jalali_date = $jdate->date('Y/m/d H:i:s', $timestamp); // Full date for tooltip
-
-                                        $today_gregorian = date('Y-m-d');
-                                        $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
-
-                                        $scheduled_day_gregorian = date('Y-m-d', $timestamp);
-
-                                        $display_date = '';
-                                        if ($scheduled_day_gregorian == $today_gregorian) {
-                                            $display_date = 'امروز ساعت ' . $jdate->date('H:i', $timestamp);
-                                        } elseif ($scheduled_day_gregorian == $tomorrow_gregorian) {
-                                            $display_date = 'فردا ساعت ' . $jdate->date('H:i', $timestamp);
                                         } else {
-                                            $display_date = $jdate->date('Y/m/d H:i', $timestamp);
+                                            echo '❌ هیچ اجرای برنامه‌ریزی‌شده‌ای برای این هوک پیدا نشد.';
                                         }
-                                        echo '<span title="' . esc_attr($jalali_date) . '">' . $display_date . '</span>';
                                     } else {
-                                        echo '❌ هیچ اجرای برنامه‌ریزی‌شده‌ای برای این هوک پیدا نشد.';
+                                        echo '❌ این افزونه برای استفاده از این قابلیت باید افزونه اکشن اسکدر را نصب کنید.';
                                     }
-                                } else {
-                                    echo '❌ این افزونه برای استفاده از این قابلیت باید افزونه اکشن اسکدر را نصب کنید.';
+                                } catch (Exception $e) {
+                                    echo '❌ خطا در نمایش زمان اجرای بعدی: ' . safe_esc_html($e->getMessage());
                                 }
                                 ?></span>
                     </span>
                     <p>
                         <span>📰 تعداد خبرهای امروز:</span>
-                        <span><?php echo (get_option('daily_post_count_for_schedule')) ? get_option('daily_post_count_for_schedule') : '-'; ?></span>
+                        <span><?php echo safe_get_option('daily_post_count_for_schedule', '-'); ?></span>
                     </p>
                     <p>
                         <span>⏱️ فاصله انتشار خبرها:</span>
-                        <span><?php echo $recurrence; ?></span>
+                        <span><?php echo isset($recurrence) ? $recurrence : '-'; ?></span>
                     </p>
                 </div>
                 <div class="i8-flex-column">
@@ -354,11 +433,11 @@ function pc_schedule_queue_page_callback()
                     </p>
                     <p>
                         <span>▶️ ساعت شروع ربات:</span>
-                        <span><?php echo get_option('start_cron_time') ? get_option('start_cron_time') : '-'; ?></span>
+                        <span><?php echo safe_get_option('start_cron_time', '-'); ?></span>
                     </p>
                     <p>
                         <span>⏹️ ساعت پایان ربات:</span>
-                        <span><?php echo get_option('end_cron_time') ? get_option('end_cron_time') : '-'; ?></span>
+                        <span><?php echo safe_get_option('end_cron_time', '-'); ?></span>
                     </p>
 
                     <small style="font-size: 12px; color: #777;">ساعات انتشار تقریبی هستند و ممکن است کمی تاخیر یا تقدم داشته باشند.</small>
@@ -414,7 +493,7 @@ function pc_schedule_queue_page_callback()
 
 
                 <?php
-                if ($results):
+                if ($results && isset($timestamp)):
                     $first_publishe_time_timestamp = $timestamp;
                     $counter = 0;
                     foreach ($results as $key => $item):
@@ -424,8 +503,7 @@ function pc_schedule_queue_page_callback()
                             <div class="col-auto bg-transparent row-counter"><?php echo $key + 1; ?></div>
                             <div class="col-11 row bg-transparent">
                                 <div class="col-12 col-xl-7 bg-transparent feed-item-title">
-                                    <a href="<?php echo get_edit_post_link($item->post_id); ?>"
-                                        target="_blank"><?php echo get_the_title($item->post_id); ?></a>
+                                    <a href="<?php echo safe_get_edit_post_link($item->post_id); ?>" target="_blank"><?php echo safe_get_the_title($item->post_id); ?></a>
                                 </div>
                                 <div class="col-4 col-xl-1 bg-transparent text-secondary item-meta-data">
 
@@ -437,37 +515,45 @@ function pc_schedule_queue_page_callback()
                                 </div>
                                 <div class="col-4 col-xl-1 bg-transparent text-secondary item-meta-data">
                                     <?php
-                                    date_default_timezone_set( 'Asia/Tehran');
-                                    $post_scheduled_timestamp = $timestamp;
-                                    if ($counter >= 1) {
-                                        $step = ($recurrence_seconds * $counter);
-                                        $post_scheduled_timestamp = ($timestamp + $step);
+                                    try {
+                                        date_default_timezone_set('Asia/Tehran');
+                                        $post_scheduled_timestamp = $timestamp;
+                                        if ($counter >= 1 && isset($recurrence_seconds) && $recurrence_seconds > 0) {
+                                            $step = ($recurrence_seconds * $counter);
+                                            $post_scheduled_timestamp = ($timestamp + $step);
+                                        }
+
+                                        if (class_exists('i8_jDateTime')) {
+                                            $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
+                                            $jalali_post_date = $jdate->date('Y/m/d H:i:s', $post_scheduled_timestamp);
+
+                                            $today_gregorian = date('Y-m-d');
+                                            $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
+                                            $scheduled_post_day_gregorian = date('Y-m-d', $post_scheduled_timestamp);
+
+                                            $display_post_date = '';
+                                            if ($scheduled_post_day_gregorian == $today_gregorian) {
+                                                $display_post_date = 'امروز ساعت ' . $jdate->date('H:i', $post_scheduled_timestamp);
+                                            } elseif ($scheduled_post_day_gregorian == $tomorrow_gregorian) {
+                                                $display_post_date = 'فردا ساعت ' . $jdate->date('H:i', $post_scheduled_timestamp);
+                                            } else {
+                                                $display_post_date = $jdate->date('Y/m/d H:i', $post_scheduled_timestamp, true, true);
+                                            }
+                                            echo '<span title="' . safe_esc_attr($jalali_post_date) . '">' . $display_post_date . '</span>';
+                                        } else {
+                                            // Fallback to Gregorian date if jDateTime class is not available
+                                            echo date('Y-m-d H:i', $post_scheduled_timestamp);
+                                        }
+                                        
+                                        $counter++;
+                                    } catch (Exception $e) {
+                                        echo '❌ خطا در نمایش تاریخ';
                                     }
-
-                                    $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
-                                    $jalali_post_date = $jdate->date('Y/m/d H:i:s', $post_scheduled_timestamp); // Full date for tooltip
-
-                                    $today_gregorian = date('Y-m-d');
-                                    $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
-
-                                    $scheduled_post_day_gregorian = date('Y-m-d', $post_scheduled_timestamp);
-
-                                    $display_post_date = '';
-                                    if ($scheduled_post_day_gregorian == $today_gregorian) {
-                                        $display_post_date = 'امروز ساعت ' . $jdate->date('H:i', $post_scheduled_timestamp);
-                                    } elseif ($scheduled_post_day_gregorian == $tomorrow_gregorian) {
-                                        $display_post_date = 'فردا ساعت ' . $jdate->date('H:i', $post_scheduled_timestamp);
-                                    } else {
-                                        $display_post_date = $jdate->date('Y/m/d H:i', $post_scheduled_timestamp, true, true); // Explicitly force Jalali and convert
-                                    }
-                                    echo '<span title="' . esc_attr($jalali_post_date) . '">' . $display_post_date . '</span>';
-
-                                    $counter++;
                                     ?>
                                 </div>
                                 <div class="col-8 col-xl-1 bg-transparent text-secondary item-meta-data" style="direction:left">
                                     <?php
-                                    $post_status = get_post_status($item->post_id);
+                                    $post_status = safe_get_post_status($item->post_id);
                                     switch ($post_status) {
                                         case 'draft':
                                             echo '<span class="text-primary">' . 'پیش نویس' . '</span>';
@@ -493,11 +579,11 @@ function pc_schedule_queue_page_callback()
                                     ?>
                                 </div>
                                 <div class="col-8 col-xl-1 bg-transparent text-secondary item-meta-data" style="direction:left">
-                                    <?php echo get_the_author_meta('display_name', get_post_field('post_author', $item->post_id)); ?>
+                                    <?php echo safe_get_author_name($item->post_id); ?>
                                 </div>
                                 <div class="col-12 col-xl-2 row gap-2 bg-transparent action-bar">
                                     <a class="col btn btn-sm rounded-pill btn-outline-secondary" title="ویرایش فید" target="_blank"
-                                        href="<?php echo get_edit_post_link($item->post_id); ?>">
+                                        href="<?php echo safe_get_edit_post_link($item->post_id); ?>">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                                             class="bi bi-pencil-square" viewBox="0 0 16 16">
                                             <path
@@ -507,7 +593,7 @@ function pc_schedule_queue_page_callback()
                                         </svg>
                                     </a>
                                     <a class="col btn btn-sm rounded-pill btn-outline-secondary " title="نمایش فید" target="_blank"
-                                        href="<?php echo get_permalink($item->post_id); ?>">
+                                        href="<?php echo safe_get_permalink($item->post_id); ?>">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                                             class="bi bi-box-arrow-up-right" viewBox="0 0 16 16">
                                             <path fill-rule="evenodd"
