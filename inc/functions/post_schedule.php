@@ -148,10 +148,12 @@ function calculate_post_publish_time()
     $start_seconds = isset($start_parts[0], $start_parts[1]) ? ($start_parts[0] * 3600 + $start_parts[1] * 60) : 0;
     $end_seconds = isset($end_parts[0], $end_parts[1]) ? ($end_parts[0] * 3600 + $end_parts[1] * 60) : 0;
 
-    // اگر ساعت پایان کمتر از شروع بود، یعنی بازه تا روز بعد ادامه دارد
+    // اگر ساعت پایان کمتر از شروع بود، یعنی بازه تا روز بعد ادامه دارد (overnight hours)
     if ($end_seconds <= $start_seconds) {
+        // For overnight hours: calculate total working time across midnight
         $interval = (24 * 3600 - $start_seconds) + $end_seconds;
     } else {
+        // Normal hours: simple subtraction
         $interval = $end_seconds - $start_seconds;
     }
     if ($interval <= 0) {
@@ -200,8 +202,13 @@ function publish_post_at_scheduling_table()
     // بررسی اینکه آیا زمان فعلی در محدوده زمان کاری است
     // اگر ساعت پایان کمتر از ساعت شروع باشد (مثلاً 22:00 تا 06:00)، باید شرایط خاصی را بررسی کنیم
     if ($end_time_candidate <= $start_time) {
+        // For overnight hours, check current time of day
+        $current_time_of_day = $now % 86400; // Get time of day in seconds since midnight
+        $start_time_of_day = $start_time % 86400;
+        $end_time_of_day = $end_time_candidate % 86400;
+        
         // در این حالت، یا زمان فعلی بعد از ساعت شروع است یا قبل از ساعت پایان روز بعد
-        $in_work_time = ($now >= $start_time || $now <= $end_time);
+        $in_work_time = ($current_time_of_day >= $start_time_of_day || $current_time_of_day <= $end_time_of_day);
     } else {
         // در حالت عادی، زمان فعلی باید بین ساعت شروع و پایان باشد
         $in_work_time = ($now >= $start_time && $now <= $end_time);

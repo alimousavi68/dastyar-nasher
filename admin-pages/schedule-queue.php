@@ -24,7 +24,7 @@ function i8_add_scheduleـqueue_page_menu()
 {
     if (function_exists('add_submenu_page')) {
         add_submenu_page(
-            'edit.php',
+            'publisher_copoilot',
             'صف انتشار',
             'صف انتشار',
             'manage_options',
@@ -438,17 +438,27 @@ function pc_schedule_queue_page_callback()
 
                                                 // Handle overnight working hours (e.g., 22:00 to 06:00)
                                                 if ($end_today_timestamp <= $start_today_timestamp) {
-                                                    if ($timestamp >= $start_today_timestamp) {
-                                                        $end_today_timestamp += 86400;
-                                                    } else {
-                                                        $start_today_timestamp -= 86400;
+                                                    // For overnight hours, check if current time is in the valid range
+                                                    $current_time_of_day = $timestamp % 86400; // Get time of day in seconds
+                                                    $start_time_of_day = $start_today_timestamp % 86400;
+                                                    $end_time_of_day = $end_today_timestamp % 86400;
+                                                    
+                                                    // If timestamp is not in working hours, adjust it
+                                                    if (!($current_time_of_day >= $start_time_of_day || $current_time_of_day <= $end_time_of_day)) {
+                                                        // Set to next start time
+                                                        if ($current_time_of_day < $start_time_of_day) {
+                                                            $timestamp = $start_today_timestamp;
+                                                        } else {
+                                                            $timestamp = $start_today_timestamp + 86400;
+                                                        }
                                                     }
-                                                }
-
-                                                if ($timestamp < $start_today_timestamp) {
-                                                    $timestamp = $start_today_timestamp;
-                                                } elseif ($timestamp > $end_today_timestamp) {
-                                                    $timestamp = $start_today_timestamp + 86400;
+                                                } else {
+                                                    // Normal working hours (e.g., 07:00 to 20:00)
+                                                    if ($timestamp < $start_today_timestamp) {
+                                                        $timestamp = $start_today_timestamp;
+                                                    } elseif ($timestamp > $end_today_timestamp) {
+                                                        $timestamp = $start_today_timestamp + 86400;
+                                                    }
                                                 }
                                             }
 
