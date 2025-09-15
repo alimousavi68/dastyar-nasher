@@ -11,21 +11,12 @@ if (!function_exists('add_action')) {
 }
 
 
-// ایجاد صفحه تنظیمات
-function publisher_copoilot_schedule_queue_page_callback()
-{
-?>
-    <div class="wrap">
-
-
-    </div>
-<?php
-}
-
-
 // فراخوانی تابع افزودن صفحه تنظیمات
 if (function_exists('add_action')) {
     add_action('admin_menu', 'i8_add_scheduleـqueue_page_menu');
+} else {
+    // Fallback if add_action is not available
+    return;
 }
 
 // تابع برای اضافه کردن صفحه تنظیمات
@@ -33,10 +24,10 @@ function i8_add_scheduleـqueue_page_menu()
 {
     if (function_exists('add_submenu_page')) {
         add_submenu_page(
-            'publisher_copoilot',
+            'edit.php',
             'صف انتشار',
             'صف انتشار',
-            'publish_posts',
+            'manage_options',
             'publisher_copoilot_schedule_queue',
             'pc_schedule_queue_page_callback'
         );
@@ -45,31 +36,52 @@ function i8_add_scheduleـqueue_page_menu()
 
 // Helper functions for safe WordPress function calls
 function safe_get_option($option_name, $default = '') {
-    return function_exists('get_option') ? get_option($option_name, $default) : $default;
+    if (function_exists('get_option')) {
+        return get_option($option_name, $default);
+    }
+    return $default;
 }
 
 function safe_esc_attr($text) {
-    return function_exists('esc_attr') ? esc_attr($text) : htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    if (function_exists('esc_attr')) {
+        return esc_attr($text);
+    }
+    return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 }
 
 function safe_esc_html($text) {
-    return function_exists('esc_html') ? esc_html($text) : htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    if (function_exists('esc_html')) {
+        return esc_html($text);
+    }
+    return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 }
 
 function safe_get_edit_post_link($post_id) {
-    return function_exists('get_edit_post_link') ? get_edit_post_link($post_id) : '#';
+    if (function_exists('get_edit_post_link')) {
+        return get_edit_post_link($post_id);
+    }
+    return '#';
 }
 
 function safe_get_the_title($post_id) {
-    return function_exists('get_the_title') ? get_the_title($post_id) : 'عنوان پست';
+    if (function_exists('get_the_title')) {
+        return get_the_title($post_id);
+    }
+    return 'عنوان پست';
 }
 
 function safe_get_post_status($post_id) {
-    return function_exists('get_post_status') ? get_post_status($post_id) : 'unknown';
+    if (function_exists('get_post_status')) {
+        return get_post_status($post_id);
+    }
+    return 'unknown';
 }
 
 function safe_get_permalink($post_id) {
-    return function_exists('get_permalink') ? get_permalink($post_id) : '#';
+    if (function_exists('get_permalink')) {
+        return get_permalink($post_id);
+    }
+    return '#';
 }
 
 function safe_get_author_name($post_id) {
@@ -80,6 +92,53 @@ function safe_get_author_name($post_id) {
         }
     }
     return 'نامشخص';
+}
+
+function safe_wp_get_current_user() {
+    if (function_exists('wp_get_current_user')) {
+        return wp_get_current_user();
+    }
+    return null;
+}
+
+function safe_current_user_can($capability) {
+    if (function_exists('current_user_can')) {
+        return current_user_can($capability);
+    }
+    return false;
+}
+
+function safe_wp_nonce_field($action, $name = '_wpnonce', $referer = true, $echo = true) {
+    if (function_exists('wp_nonce_field')) {
+        return wp_nonce_field($action, $name, $referer, $echo);
+    }
+    return '';
+}
+
+function safe_wp_verify_nonce($nonce, $action) {
+    if (function_exists('wp_verify_nonce')) {
+        return wp_verify_nonce($nonce, $action);
+    }
+    return false;
+}
+
+function safe_wp_die($message = '', $title = '', $args = array()) {
+    if (function_exists('wp_die')) {
+        wp_die($message, $title, $args);
+    } else {
+        die($message);
+    }
+}
+
+function safe_get_recurrence($schedule) {
+    return (is_object($schedule) && method_exists($schedule, 'get_recurrence')) ? $schedule->get_recurrence() : 0;
+}
+
+function safe_get_schedule_date($schedule) {
+    if (!is_object($schedule) || !method_exists($schedule, 'get_date')) {
+        return null;
+    }
+    return $schedule->get_date();
 }
 
 function post_priority_persian($priority)
@@ -104,13 +163,17 @@ function pc_schedule_queue_page_callback()
 {
     // یک کویری میخام که بره لیستی از رکوردهای جدول i8_pc_post_schedule رو برام واکشی کنه و در یک متغییر بهم بده
     global $wpdb;
-    $query = "SELECT * FROM {$wpdb->prefix}pc_post_schedule ORDER BY FIELD(publish_priority, 'high', 'medium', 'low'), id ASC ";
-    $results = $wpdb->get_results($query);
-    // رکورد های result بر اساس اینکه اول اونایی که فیلد publish_priority شون high هست و بعد اونایی که medium هست و بعد اونایی که low هست بهم مرتب کن
+    $results = array();
+    $post_publish_priority = array();
+    
+    if (isset($wpdb) && is_object($wpdb) && method_exists($wpdb, 'get_results')) {
+        $query = "SELECT * FROM {$wpdb->prefix}pc_post_schedule ORDER BY FIELD(publish_priority, 'high', 'medium', 'low'), id ASC ";
+        $results = $wpdb->get_results($query);
+        // رکورد های result بر اساس اینکه اول اونایی که فیلد publish_priority شون high هست و بعد اونایی که medium هست و بعد اونایی که low هست بهم مرتب کن
 
-    global $wpdb;
-    $query = "SELECT publish_priority, COUNT(*) as count FROM {$wpdb->prefix}pc_post_schedule GROUP BY publish_priority";
-    $post_publish_priority = $wpdb->get_results($query);
+        $query = "SELECT publish_priority, COUNT(*) as count FROM {$wpdb->prefix}pc_post_schedule GROUP BY publish_priority";
+        $post_publish_priority = $wpdb->get_results($query);
+    }
 
 
 ?>
@@ -312,10 +375,10 @@ function pc_schedule_queue_page_callback()
                                     $recurrence_seconds = 0; // Initialize recurrence_seconds
                                     $timestamp = null; // Initialize timestamp
                                     
-                                    if (function_exists('as_next_scheduled_action')) {
+                                    if (function_exists('as_next_scheduled_action') && function_exists('as_get_scheduled_actions')) {
                                         $actions = as_get_scheduled_actions([
                                             'hook'     => 'i8_action_publish_post_at_scheduling_table',
-                                            'status'   => ActionScheduler_Store::STATUS_PENDING,
+                                            'status'   => (class_exists('ActionScheduler_Store') ? ActionScheduler_Store::STATUS_PENDING : 'pending'),
                                             'per_page' => 1,
                                             'orderby'  => 'scheduled_date',
                                             'order'    => 'ASC',
@@ -323,18 +386,25 @@ function pc_schedule_queue_page_callback()
                                         
                                         if (!empty($actions)) {
                                             $action_id = array_key_first($actions);
-                                            $action = ActionScheduler::store()->fetch_action($action_id);
+                                            $action = null;
+                                            if (class_exists('ActionScheduler') && method_exists('ActionScheduler', 'store')) {
+                                                $store = ActionScheduler::store();
+                                                if (method_exists($store, 'fetch_action')) {
+                                                    $action = $store->fetch_action($action_id);
+                                                }
+                                            }
                                             
                                             if ($action) {
-                                                $schedule = $action->get_schedule();
+                                                $schedule = null;
+                                                if (method_exists($action, 'get_schedule')) {
+                                                    $schedule = $action->get_schedule();
+                                                }
                                                 
                                                 if ($schedule && is_object($schedule)) {
                                      try {
-                                         if (method_exists($schedule, 'get_recurrence')) {
-                                             $recurrence_seconds = $schedule->get_recurrence();
-                                             if ($recurrence_seconds) {
-                                                 $recurrence = 'هر ' . ($recurrence_seconds / 60) . ' دقیقه';
-                                             }
+                                         $recurrence_seconds = safe_get_recurrence($schedule);
+                                         if ($recurrence_seconds) {
+                                             $recurrence = 'هر ' . ($recurrence_seconds / 60) . ' دقیقه';
                                          }
                                      } catch (Exception $e) {
                                          // Ignore method call errors
@@ -343,12 +413,10 @@ function pc_schedule_queue_page_callback()
                                  
                                  if ($schedule && is_object($schedule)) {
                                      try {
-                                         if (method_exists($schedule, 'get_date')) {
-                                             $scheduled_date = $schedule->get_date();
-                                             if ($scheduled_date && is_object($scheduled_date) && method_exists($scheduled_date, 'getTimestamp')) {
-                                                 $timestamp = $scheduled_date->getTimestamp();
-                                                 date_default_timezone_set('Asia/Tehran');
-                                             }
+                                         $scheduled_date = safe_get_schedule_date($schedule);
+                                         if ($scheduled_date && is_object($scheduled_date) && method_exists($scheduled_date, 'getTimestamp')) {
+                                             $timestamp = $scheduled_date->getTimestamp();
+                                             date_default_timezone_set('Asia/Tehran');
                                          }
                                      } catch (Exception $e) {
                                          // Ignore method call errors
@@ -386,25 +454,34 @@ function pc_schedule_queue_page_callback()
 
                                             // Check if jDateTime class exists before using it
                                             if (class_exists('i8_jDateTime')) {
-                                                $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
-                                                $jalali_date = $jdate->date('Y/m/d H:i:s', $timestamp);
-
-                                                $today_gregorian = date('Y-m-d');
-                                                $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
-                                                $scheduled_day_gregorian = date('Y-m-d', $timestamp);
-
-                                                $display_date = '';
-                                                if ($scheduled_day_gregorian == $today_gregorian) {
-                                                    $display_date = 'امروز ساعت ' . $jdate->date('H:i', $timestamp);
-                                                } elseif ($scheduled_day_gregorian == $tomorrow_gregorian) {
-                                                    $display_date = 'فردا ساعت ' . $jdate->date('H:i', $timestamp);
+                                                // Validate timestamp before using with jDateTime
+                                                if (empty($timestamp) || !is_numeric($timestamp) || $timestamp <= 0) {
+                                                    echo '❌ زمان نامعتبر برای نمایش';
                                                 } else {
-                                                    $display_date = $jdate->date('Y/m/d H:i', $timestamp);
+                                                    $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
+                                                    $jalali_date = $jdate->date('Y/m/d H:i:s', $timestamp);
+
+                                                    $today_gregorian = date('Y-m-d');
+                                                    $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
+                                                    $scheduled_day_gregorian = date('Y-m-d', $timestamp);
+
+                                                    $display_date = '';
+                                                    if ($scheduled_day_gregorian == $today_gregorian) {
+                                                        $display_date = 'امروز ساعت ' . $jdate->date('H:i', $timestamp);
+                                                    } elseif ($scheduled_day_gregorian == $tomorrow_gregorian) {
+                                                        $display_date = 'فردا ساعت ' . $jdate->date('H:i', $timestamp);
+                                                    } else {
+                                                        $display_date = $jdate->date('Y/m/d H:i', $timestamp);
+                                                    }
+                                                    echo '<span title="' . safe_esc_attr($jalali_date) . '">' . $display_date . '</span>';
                                                 }
-                                                echo '<span title="' . safe_esc_attr($jalali_date) . '">' . $display_date . '</span>';
                                             } else {
                                                 // Fallback to Gregorian date if jDateTime class is not available
-                                                echo date('Y-m-d H:i', $timestamp);
+                                                if (!empty($timestamp) && is_numeric($timestamp) && $timestamp > 0) {
+                                                    echo date('Y-m-d H:i', $timestamp);
+                                                } else {
+                                                    echo '❌ زمان نامعتبر';
+                                                }
                                             }
                                         } else {
                                             echo '❌ هیچ اجرای برنامه‌ریزی‌شده‌ای برای این هوک پیدا نشد.';
@@ -517,10 +594,23 @@ function pc_schedule_queue_page_callback()
                                     <?php
                                     try {
                                         date_default_timezone_set('Asia/Tehran');
+                                        
+                                        // Validate timestamp before using it
+                                        if (empty($timestamp) || !is_numeric($timestamp) || $timestamp <= 0) {
+                                            echo '❌ زمان نامعتبر';
+                                            continue;
+                                        }
+                                        
                                         $post_scheduled_timestamp = $timestamp;
                                         if ($counter >= 1 && isset($recurrence_seconds) && $recurrence_seconds > 0) {
                                             $step = ($recurrence_seconds * $counter);
                                             $post_scheduled_timestamp = ($timestamp + $step);
+                                        }
+
+                                        // Additional validation for calculated timestamp
+                                        if (empty($post_scheduled_timestamp) || !is_numeric($post_scheduled_timestamp) || $post_scheduled_timestamp <= 0) {
+                                            echo '❌ زمان محاسبه شده نامعتبر';
+                                            continue;
                                         }
 
                                         if (class_exists('i8_jDateTime')) {
