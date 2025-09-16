@@ -436,8 +436,13 @@ function pc_schedule_queue_page_callback()
                                                 $start_today_timestamp = strtotime($today . ' ' . $start_cron_time);
                                                 $end_today_timestamp = strtotime($today . ' ' . $end_cron_time);
 
-                                                // Handle overnight working hours (e.g., 22:00 to 06:00)
-                                                if ($end_today_timestamp <= $start_today_timestamp) {
+                                                // Parse time strings to get hour values for comparison
+                                                $start_hour = (int)explode(':', $start_cron_time)[0];
+                                                $end_hour = (int)explode(':', $end_cron_time)[0];
+                                                
+                                                // Check if this is overnight hours (e.g., 22:00 to 06:00)
+                                                // Overnight means start hour is greater than end hour
+                                                if ($start_hour > $end_hour) {
                                                     // For overnight hours, check if current time is in the valid range
                                                     $current_time_of_day = $timestamp % 86400; // Get time of day in seconds
                                                     $start_time_of_day = $start_today_timestamp % 86400;
@@ -453,7 +458,7 @@ function pc_schedule_queue_page_callback()
                                                         }
                                                     }
                                                 } else {
-                                                    // Normal working hours (e.g., 07:00 to 20:00)
+                                                    // Normal working hours (e.g., 01:00 to 23:00 or 07:00 to 20:00)
                                                     if ($timestamp < $start_today_timestamp) {
                                                         $timestamp = $start_today_timestamp;
                                                     } elseif ($timestamp > $end_today_timestamp) {
