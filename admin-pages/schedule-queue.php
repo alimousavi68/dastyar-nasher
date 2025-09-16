@@ -430,40 +430,17 @@ function pc_schedule_queue_page_callback()
                             $start_cron_time = safe_get_option('start_cron_time');
                              $end_cron_time = safe_get_option('end_cron_time');
 
-                                            // Adjust timestamp based on working hours
+                                            // Adjust timestamp based on working hours (simplified logic)
                                             if ($start_cron_time && $end_cron_time) {
                                                 $today = date('Y-m-d', $timestamp);
                                                 $start_today_timestamp = strtotime($today . ' ' . $start_cron_time);
                                                 $end_today_timestamp = strtotime($today . ' ' . $end_cron_time);
 
-                                                // Parse time strings to get hour values for comparison
-                                                $start_hour = (int)explode(':', $start_cron_time)[0];
-                                                $end_hour = (int)explode(':', $end_cron_time)[0];
-                                                
-                                                // Check if this is overnight hours (e.g., 22:00 to 06:00)
-                                                // Overnight means start hour is greater than end hour
-                                                if ($start_hour > $end_hour) {
-                                                    // For overnight hours, check if current time is in the valid range
-                                                    $current_time_of_day = $timestamp % 86400; // Get time of day in seconds
-                                                    $start_time_of_day = $start_today_timestamp % 86400;
-                                                    $end_time_of_day = $end_today_timestamp % 86400;
-                                                    
-                                                    // If timestamp is not in working hours, adjust it
-                                                    if (!($current_time_of_day >= $start_time_of_day || $current_time_of_day <= $end_time_of_day)) {
-                                                        // Set to next start time
-                                                        if ($current_time_of_day < $start_time_of_day) {
-                                                            $timestamp = $start_today_timestamp;
-                                                        } else {
-                                                            $timestamp = $start_today_timestamp + 86400;
-                                                        }
-                                                    }
-                                                } else {
-                                                    // Normal working hours (e.g., 01:00 to 23:00 or 07:00 to 20:00)
-                                                    if ($timestamp < $start_today_timestamp) {
-                                                        $timestamp = $start_today_timestamp;
-                                                    } elseif ($timestamp > $end_today_timestamp) {
-                                                        $timestamp = $start_today_timestamp + 86400;
-                                                    }
+                                                // Simple working hours check - no overnight logic
+                                                if ($timestamp < $start_today_timestamp) {
+                                                    $timestamp = $start_today_timestamp;
+                                                } elseif ($timestamp > $end_today_timestamp) {
+                                                    $timestamp = $start_today_timestamp + 86400;
                                                 }
                                             }
 

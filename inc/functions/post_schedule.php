@@ -148,20 +148,9 @@ function calculate_post_publish_time()
     $start_seconds = isset($start_parts[0], $start_parts[1]) ? ($start_parts[0] * 3600 + $start_parts[1] * 60) : 0;
     $end_seconds = isset($end_parts[0], $end_parts[1]) ? ($end_parts[0] * 3600 + $end_parts[1] * 60) : 0;
 
-    // Parse time strings to get hour values for comparison
-    $start_hour_calc = (int)explode(':', $post_publisher_start_time)[0];
-    $end_hour_calc = (int)explode(':', $post_publisher_end_time)[0];
-    
-    // اگر ساعت شروع بزرگتر از پایان بود، یعنی بازه overnight است (مثل 22:00 تا 06:00)
-    if ($start_hour_calc > $end_hour_calc) {
-        // For overnight hours: calculate total working time across midnight
-        // Example: 22:00 to 06:00 = (24:00 - 22:00) + (06:00 - 00:00) = 2 + 6 = 8 hours
-        $interval = (24 * 3600 - $start_seconds) + $end_seconds;
-    } else {
-        // Normal working hours: simple subtraction
-        // Example: 01:00 to 23:00 = 23:00 - 01:00 = 22 hours
-        $interval = $end_seconds - $start_seconds;
-    }
+    // Simple working hours calculation - no overnight logic
+    // Calculate interval as simple subtraction
+    $interval = $end_seconds - $start_seconds;
     if ($interval <= 0) {
         $interval = 1; // جلوگیری از تقسیم بر صفر یا زمان منفی
     }
@@ -196,33 +185,13 @@ function publish_post_at_scheduling_table()
     $start_time = strtotime($today . ' ' . $start_time_str);
     $end_time_candidate = strtotime($today . ' ' . $end_time_str);
 
-    // Parse time strings to get hour values for comparison
-    $start_hour = (int)explode(':', $start_time_str)[0];
-    $end_hour = (int)explode(':', $end_time_str)[0];
-    
-    // اگر ساعت شروع بزرگتر از ساعت پایان بود، یعنی بازه overnight است (مثل 22:00 تا 06:00)
-    if ($start_hour > $end_hour) {
-        $end_time = $end_time_candidate + 86400; // اضافه کردن یک روز به ساعت پایان
-    } else {
-        $end_time = $end_time_candidate;
-    }
+    // Simple working hours check - no overnight logic
+    $end_time = $end_time_candidate;
 
     error_log('i8_action_publish_post_at_scheduling_table DEBUG - start_time: ' . date('Y-m-d H:i:s', $start_time) . ' end_time: ' . date('Y-m-d H:i:s', $end_time) . ' now: ' . date('Y-m-d H:i:s', $now));
     
     // بررسی اینکه آیا زمان فعلی در محدوده زمان کاری است
-    // اگر ساعت شروع بزرگتر از ساعت پایان باشد (مثلاً 22:00 تا 06:00)، باید شرایط خاصی را بررسی کنیم
-    if ($start_hour > $end_hour) {
-        // For overnight hours, check current time of day
-        $current_time_of_day = $now % 86400; // Get time of day in seconds since midnight
-        $start_time_of_day = $start_time % 86400;
-        $end_time_of_day = $end_time_candidate % 86400;
-        
-        // در این حالت، یا زمان فعلی بعد از ساعت شروع است یا قبل از ساعت پایان روز بعد
-        $in_work_time = ($current_time_of_day >= $start_time_of_day || $current_time_of_day <= $end_time_of_day);
-    } else {
-        // در حالت عادی، زمان فعلی باید بین ساعت شروع و پایان باشد
-        $in_work_time = ($now >= $start_time && $now <= $end_time);
-    }
+    $in_work_time = ($now >= $start_time && $now <= $end_time);
     error_log('i8_action_publish_post_at_scheduling_table DEBUG - in_work_time: ' . ($in_work_time ? 'true' : 'false'));
     // تنظیم محدوده زمانی
     if (!$in_work_time) {
