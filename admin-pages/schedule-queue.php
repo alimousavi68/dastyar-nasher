@@ -476,8 +476,19 @@ function pc_schedule_queue_page_callback()
                                                 }
                                             }
                                         } else {
-                                            echo '❌ هیچ اجرای برنامه‌ریزی‌شده‌ای برای این هوک پیدا نشد.';
-                                        }
+                            echo '<div style="background: #fff2cc; border: 1px solid #d69e2e; border-radius: 4px; padding: 15px; margin: 10px 0;">';
+                            echo '<p style="color: #d63638; font-weight: bold; margin: 0 0 10px 0;">❌ هیچ اجرای برنامه‌ریزی‌شده‌ای برای این هوک پیدا نشد.</p>';
+                            echo '<p style="color: #666; font-size: 14px; margin: 0 0 15px 0;">این مشکل ممکن است به دلایل زیر رخ دهد:</p>';
+                            echo '<ul style="color: #666; font-size: 14px; margin: 0 0 15px 20px;">';
+                            echo '<li>Action Scheduler به طور خودکار action را حذف کرده است</li>';
+                            echo '<li>خطا در تابع اصلی برنامه‌ریزی رخ داده است</li>';
+                            echo '<li>تنظیمات زمانی نادرست است</li>';
+                            echo '<li>مشکل در پلاگین Action Scheduler</li>';
+                            echo '</ul>';
+                            echo '<button onclick="i8_recreate_scheduled_action()" style="background: #0073aa; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">🔄 بازیابی خودکار</button>';
+                            echo '<p style="color: #666; font-size: 12px; margin: 10px 0 0 0;">💡 اگر مشکل ادامه داشت، تنظیمات زمان شروع و پایان را بررسی کنید.</p>';
+                            echo '</div>';
+                        }
                                     } else {
                                         echo '❌ این افزونه برای استفاده از این قابلیت باید افزونه اکشن اسکدر را نصب کنید.';
                                     }
@@ -743,6 +754,36 @@ function pc_schedule_queue_page_callback()
                 }
 
             });
+            
+            // تابع بازیابی خودکار scheduled action
+            window.i8_recreate_scheduled_action = function() {
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'i8_recreate_scheduled_action',
+                        nonce: '<?php echo wp_create_nonce("i8_recreate_action"); ?>'
+                    },
+                    dataType: 'json',
+                    beforeSend: function() {
+                        $('button[onclick="i8_recreate_scheduled_action()"]').prop('disabled', true).text('در حال بازیابی...');
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            alert('✅ scheduled action با موفقیت بازیابی شد!');
+                            location.reload();
+                        } else {
+                            alert('❌ خطا در بازیابی: ' + response.message);
+                        }
+                    },
+                    error: function() {
+                        alert('❌ مشکلی در ارتباط با سرور پیش آمد');
+                    },
+                    complete: function() {
+                        $('button[onclick="i8_recreate_scheduled_action()"]').prop('disabled', false).text('🔄 بازیابی خودکار');
+                    }
+                });
+            };
         });
     </script>
 
