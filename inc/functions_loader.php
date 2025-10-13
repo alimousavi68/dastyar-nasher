@@ -3,7 +3,7 @@ require_once(__DIR__ . '/../../../../wp-load.php');
 require_once(__DIR__ . '/../../../../wp-admin/includes/media.php');
 require_once(__DIR__ . '/../../../../wp-admin/includes/image.php');
 require_once(__DIR__ . '/../../../../wp-admin/includes/file.php');
-define('COP_REST_API_SERVER_URL', 'https://dastyar.online/wp-json/license/v1/validate/');
+define('COP_REST_API_SERVER_URL', 'https://sardabir.online/wp-json/license/v1/validate/');
 
 
 
