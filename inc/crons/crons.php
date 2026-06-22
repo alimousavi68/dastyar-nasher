@@ -30,6 +30,11 @@ function custom_rss_parser_schedule_event()
         wp_schedule_event(time(), 'daily', 'set_daily_post_count_for_schedule_task');
     }
 
+    // Schedule for Auto Cleaning Reports Weekly
+    if (!wp_next_scheduled('i8_weekly_cleanup_reports_event')) {
+        wp_schedule_event(time(), 'weekly', 'i8_weekly_cleanup_reports_event');
+    }
+
 }
 
 
@@ -41,6 +46,15 @@ function set_daily_post_count_for_schedule_task()
     $news_interval_end = get_option('news_interval_end') ? get_option('news_interval_end') : '30';
 
     update_option('daily_post_count_for_schedule', rand($news_interval_start, $news_interval_end));
+}
+
+// Hook to handle weekly reports cleanup
+add_action('i8_weekly_cleanup_reports_event', 'i8_weekly_cleanup_reports');
+function i8_weekly_cleanup_reports() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'pc_reports';
+    $wpdb->query("DELETE FROM $table_name");
+    error_log('i8: Auto cleaned up system reports (weekly).');
 }
 
 // Hook to handle the scheduled event
