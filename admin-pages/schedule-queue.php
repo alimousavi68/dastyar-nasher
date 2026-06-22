@@ -476,19 +476,35 @@ function pc_schedule_queue_page_callback()
                                                 }
                                             }
                                         } else {
-                            echo '<div style="background: #fff2cc; border: 1px solid #d69e2e; border-radius: 4px; padding: 15px; margin: 10px 0;">';
-                            echo '<p style="color: #d63638; font-weight: bold; margin: 0 0 10px 0;">❌ هیچ اجرای برنامه‌ریزی‌شده‌ای برای این هوک پیدا نشد.</p>';
-                            echo '<p style="color: #666; font-size: 14px; margin: 0 0 15px 0;">این مشکل ممکن است به دلایل زیر رخ دهد:</p>';
-                            echo '<ul style="color: #666; font-size: 14px; margin: 0 0 15px 20px;">';
-                            echo '<li>Action Scheduler به طور خودکار action را حذف کرده است</li>';
-                            echo '<li>خطا در تابع اصلی برنامه‌ریزی رخ داده است</li>';
-                            echo '<li>تنظیمات زمانی نادرست است</li>';
-                            echo '<li>مشکل در پلاگین Action Scheduler</li>';
-                            echo '</ul>';
-                            echo '<button onclick="i8_recreate_scheduled_action()" style="background: #0073aa; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">🔄 بازیابی خودکار</button>';
-                            echo '<p style="color: #666; font-size: 12px; margin: 10px 0 0 0;">💡 اگر مشکل ادامه داشت، تنظیمات زمان شروع و پایان را بررسی کنید.</p>';
-                            echo '</div>';
-                        }
+                                            $is_running = false;
+                                            if (function_exists('as_get_scheduled_actions')) {
+                                                $running_actions = as_get_scheduled_actions([
+                                                    'hook'     => 'i8_action_publish_post_at_scheduling_table',
+                                                    'status'   => (class_exists('ActionScheduler_Store') ? ActionScheduler_Store::STATUS_RUNNING : 'in-progress'),
+                                                    'per_page' => 1,
+                                                ]);
+                                                if (!empty($running_actions)) {
+                                                    $is_running = true;
+                                                }
+                                            }
+
+                                            if ($is_running) {
+                                                echo '<span style="color: #0073aa; font-weight: bold; background: #e5f5fa; padding: 4px 10px; border-radius: 4px; border: 1px solid #0073aa;">⏳ در حال اجرا و انتشار (لطفاً کمی صبر کنید)...</span>';
+                                            } else {
+                                                echo '<div style="background: #fff2cc; border: 1px solid #d69e2e; border-radius: 4px; padding: 15px; margin: 10px 0;">';
+                                                echo '<p style="color: #d63638; font-weight: bold; margin: 0 0 10px 0;">❌ هیچ اجرای برنامه‌ریزی‌شده‌ای برای این هوک پیدا نشد.</p>';
+                                                echo '<p style="color: #666; font-size: 14px; margin: 0 0 15px 0;">این مشکل ممکن است به دلایل زیر رخ دهد:</p>';
+                                                echo '<ul style="color: #666; font-size: 14px; margin: 0 0 15px 20px;">';
+                                                echo '<li>Action Scheduler به طور خودکار action را حذف کرده است</li>';
+                                                echo '<li>خطا در تابع اصلی برنامه‌ریزی رخ داده است</li>';
+                                                echo '<li>تنظیمات زمانی نادرست است</li>';
+                                                echo '<li>مشکل در پلاگین Action Scheduler</li>';
+                                                echo '</ul>';
+                                                echo '<button onclick="i8_recreate_scheduled_action()" style="background: #0073aa; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">🔄 بازیابی خودکار</button>';
+                                                echo '<p style="color: #666; font-size: 12px; margin: 10px 0 0 0;">💡 اگر مشکل ادامه داشت، تنظیمات زمان شروع و پایان را بررسی کنید.</p>';
+                                                echo '</div>';
+                                            }
+                                        }
                                     } else {
                                         echo '❌ این افزونه برای استفاده از این قابلیت باید افزونه اکشن اسکدر را نصب کنید.';
                                     }

@@ -160,15 +160,12 @@ function i8_change_post_status($priority_posts)
 
             date_default_timezone_set('Asia/Tehran');
 
-            $random_interval = rand(400, 900);
-            $publish_time = time() + $random_interval;
-
-            // Prepare data for creating a WordPress post
+            // بجای قرار دادن در حالت future، مستقیما منتشر میکنیم تا جلوی انباشت و تاخیر گرفته شود
             $post_data = array(
                 'ID' => $post_id,
-                'post_status' => 'future',
-                'post_date' => date('Y-m-d H:i:s', $publish_time), // استفاده از زمان تصادفی برای post_date
-                'post_date_gmt' => gmdate('Y-m-d H:i:s', $publish_time), // استفاده از زمان تصادفی برای post_date_gmt
+                'post_status' => 'publish',
+                'post_date' => current_time('mysql'),
+                'post_date_gmt' => current_time('mysql', 1),
             );
             wp_update_post($post_data);
 
@@ -208,15 +205,17 @@ function calculate_post_publish_time()
     $start_seconds = isset($start_parts[0], $start_parts[1]) ? ($start_parts[0] * 3600 + $start_parts[1] * 60) : 0;
     $end_seconds = isset($end_parts[0], $end_parts[1]) ? ($end_parts[0] * 3600 + $end_parts[1] * 60) : 0;
 
-    // Simple working hours calculation - no overnight logic
-    // Calculate interval as simple subtraction
+    // محاسبه ساده فواصل زمانی بدون خطر تقسیم بر صفر
     $interval = $end_seconds - $start_seconds;
     if ($interval <= 0) {
-        $interval = 1; // جلوگیری از تقسیم بر صفر یا زمان منفی
+        $interval = 1; // جلوگیری از مقدار صفر
     }
-
-    $post_per_hours = ($post_publisher_daily_post_count / ($interval / 3600));
-    $post_publishe_interval_time = (ceil(60 / $post_per_hours))*60;
+    
+    $post_count = max(1, $post_publisher_daily_post_count);
+    $post_publishe_interval_time = round($interval / $post_count);
+    
+    // اگر فاصله زمانی کمتر از ۱ دقیقه شد، حداقل ۶۰ ثانیه در نظر می‌گیریم
+    $post_publishe_interval_time = max(60, $post_publishe_interval_time);
 
     error_log('i8_calculate_post_publish_time DEBUG - start_cron_time: ' . $post_publisher_start_time . ' end_cron_time: ' . $post_publisher_end_time);
     error_log('i8_calculate_post_publish_time DEBUG - start_seconds: ' . $start_seconds . ' end_seconds: ' . $end_seconds);
@@ -283,17 +282,8 @@ function publish_post_at_scheduling_table()
         error_log('i8: Error in publish_post_at_scheduling_table: ' . $e->getMessage());
         error_log('i8: Stack trace: ' . $e->getTraceAsString());
         
-        // بازیابی خودکار با تاخیر ۵ دقیقه‌ای
-        if (function_exists('wp_schedule_single_event')) {
-            wp_schedule_single_event(time() + 300, 'i8_action_publish_post_at_scheduling_table');
-            error_log('i8: Scheduled recovery action in 5 minutes');
-        }
-        
-        // اطمینان از وجود scheduled action اصلی
-        if (function_exists('do_action')) {
-            do_action('i8_action_set_cron_job_publishe_posts');
-            error_log('i8: Recreated main scheduled action after error');
-        }
+        // ثبت لاگ از خطا. بازیابی خودکار توسط تابع i8_ensure_scheduled_action_exists انجام خواهد شد.
+        error_log('i8: Automatic recovery will be handled by i8_ensure_scheduled_action_exists on next admin_init or fallback cron.');
     }
 }
 
