@@ -10,12 +10,19 @@ if (!function_exists('add_action')) {
     return;
 }
 
+// Helper to convert numbers to Persian
+if (!function_exists('i8_to_persian_num')) {
+    function i8_to_persian_num($number) {
+        $english_digits = array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
+        $persian_digits = array('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹');
+        return str_replace($english_digits, $persian_digits, (string)$number);
+    }
+}
 
 // فراخوانی تابع افزودن صفحه تنظیمات
 if (function_exists('add_action')) {
     add_action('admin_menu', 'i8_add_scheduleـqueue_page_menu');
 } else {
-    // Fallback if add_action is not available
     return;
 }
 
@@ -42,6 +49,7 @@ function safe_get_option($option_name, $default = '') {
     return $default;
 }
 
+// esc_attr wrapper
 function safe_esc_attr($text) {
     if (function_exists('esc_attr')) {
         return esc_attr($text);
@@ -49,6 +57,7 @@ function safe_esc_attr($text) {
     return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 }
 
+// esc_html wrapper
 function safe_esc_html($text) {
     if (function_exists('esc_html')) {
         return esc_html($text);
@@ -65,9 +74,10 @@ function safe_get_edit_post_link($post_id) {
 
 function safe_get_the_title($post_id) {
     if (function_exists('get_the_title')) {
-        return get_the_title($post_id);
+        $title = get_the_title($post_id);
+        return !empty($title) ? $title : 'بدون عنوان';
     }
-    return 'عنوان پست';
+    return 'بدون عنوان';
 }
 
 function safe_get_post_status($post_id) {
@@ -134,6 +144,7 @@ function safe_get_recurrence($schedule) {
     return (is_object($schedule) && method_exists($schedule, 'get_recurrence')) ? $schedule->get_recurrence() : 0;
 }
 
+// get schedule date
 function safe_get_schedule_date($schedule) {
     if (!is_object($schedule) || !method_exists($schedule, 'get_date')) {
         return null;
@@ -145,14 +156,11 @@ function post_priority_persian($priority)
 {
     switch ($priority) {
         case 'high':
-            return '<span class="text-danger">' . 'اولویت بالا' . '</span>';
-            break;
+            return 'اولویت بالا';
         case 'medium':
-            return '<span class="text-warning">' . 'اولویت متوسط' . '</span>';
-            break;
+            return 'اولویت متوسط';
         case 'low':
-            return '<span class="text-success">' . 'اولویت پایین' . '</span>';
-            break;
+            return 'اولویت پایین';
         default:
             return $priority;
     }
@@ -161,617 +169,725 @@ function post_priority_persian($priority)
 // تابع بازگشتی برای نمایش بخش تنظیمات
 function pc_schedule_queue_page_callback()
 {
-    // یک کویری میخام که بره لیستی از رکوردهای جدول i8_pc_post_schedule رو برام واکشی کنه و در یک متغییر بهم بده
     global $wpdb;
     $results = array();
     $post_publish_priority = array();
     
     if (isset($wpdb) && is_object($wpdb) && method_exists($wpdb, 'get_results')) {
-        $query = "SELECT * FROM {$wpdb->prefix}pc_post_schedule ORDER BY FIELD(publish_priority, 'high', 'medium', 'low'), id ASC ";
+        // ایجاد محدودیت ۱۰۰ تایی برای جلوگیری از کرش احتمالی در صف‌های بسیار طولانی
+        $query = "SELECT * FROM {$wpdb->prefix}pc_post_schedule ORDER BY FIELD(publish_priority, 'high', 'medium', 'low'), id ASC LIMIT 100";
         $results = $wpdb->get_results($query);
-        // رکورد های result بر اساس اینکه اول اونایی که فیلد publish_priority شون high هست و بعد اونایی که medium هست و بعد اونایی که low هست بهم مرتب کن
 
         $query = "SELECT publish_priority, COUNT(*) as count FROM {$wpdb->prefix}pc_post_schedule GROUP BY publish_priority";
         $post_publish_priority = $wpdb->get_results($query);
     }
-
-
 ?>
-    <link href="<?php echo (COP_PLUGIN_URL . '/assets/css/bootstrap.min.css'); ?>" rel="stylesheet">
-
     <style>
-        .row-counter {
+        :root {
+            --i8-primary: #4f46e5;
+            --i8-primary-hover: #4338ca;
+            --i8-secondary: #0ea5e9;
+            --i8-success: #10b981;
+            --i8-warning: #f59e0b;
+            --i8-danger: #ef4444;
+            --i8-neutral-50: #f8fafc;
+            --i8-neutral-100: #f1f5f9;
+            --i8-neutral-800: #1e293b;
+            --i8-glass-bg: rgba(255, 255, 255, 0.75);
+            --i8-glass-border: rgba(226, 232, 240, 0.8);
+        }
+
+        .i8-dashboard-wrap {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+            margin: 20px 20px 0 0;
+            max-width: 98%; /* استفاده از پهنای کامل صفحه */
+            direction: rtl;
+        }
+
+        .i8-dashboard-header {
             display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .i8-title-sec h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--i8-neutral-800);
+            margin: 0 0 6px 0;
+        }
+
+        .i8-title-sec .description {
+            font-size: 14px;
+            color: #64748b;
+            margin: 0;
+        }
+
+        .i8-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .i8-btn-primary {
+            background: linear-gradient(135deg, var(--i8-primary), #6366f1);
+            color: white;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
+        }
+
+        .i8-btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+        }
+
+        .i8-btn-secondary {
+            background: white;
+            color: var(--i8-neutral-800);
+            border: 1px solid #cbd5e1;
+        }
+
+        .i8-btn-secondary:hover {
+            background: var(--i8-neutral-100);
+        }
+
+        /* Stats Grid */
+        .i8-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .i8-stat-card {
+            background: var(--i8-glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--i8-glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.02);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .i8-stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.04);
+        }
+
+        .i8-stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
             justify-content: center;
-            align-items: center;
+            font-size: 24px;
+        }
+
+        .i8-stat-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .i8-stat-label {
             font-size: 13px;
-            font-family: serif !important;
-            color: #767575;
+            color: #64748b;
+            font-weight: 500;
         }
 
-        .item-meta-data {
-            font-size: 13px;
-            color: #767575;
+        .i8-stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--i8-neutral-800);
+            margin-top: 4px;
         }
 
-        .wp-filter {
-            border: 3px solid #f2f2f2;
+        /* Colors for Card Icons */
+        .i8-bg-primary { background: rgba(79, 70, 229, 0.1); color: var(--i8-primary); }
+        .i8-bg-success { background: rgba(16, 185, 129, 0.1); color: var(--i8-success); }
+        .i8-bg-warning { background: rgba(245, 158, 11, 0.1); color: var(--i8-warning); }
+        .i8-bg-danger { background: rgba(239, 68, 68, 0.1); color: var(--i8-danger); }
+
+        /* Container Card */
+        .i8-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+            padding: 24px;
+            margin-bottom: 24px;
         }
 
-        .action-bar .btn {
-            max-height: 31px;
-        }
-
-        .table {
-            border: 3px solid #f2f2f2;
-        }
-
-        .th {
-            padding: 5px;
-
-            font-weight: bold;
-            min-height: 50px;
-            display: flex !important;
-            align-content: center;
-            justify-content: flex-start;
-            flex-wrap: wrap;
+        .i8-card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--i8-neutral-800);
+            margin: 0 0 20px 0;
+            display: flex;
             align-items: center;
-            color: #757575;
+            gap: 10px;
         }
 
-        .tr:nth-child(even) {
-            background-color: #f2f2f2;
-            color: #4c4c4ccc;
+        /* Table */
+        .i8-table-wrapper {
+            overflow-x: auto;
         }
 
-        .tr:nth-child(odd) {
-            background-color: #ffffff;
+        .i8-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: right;
         }
 
-        .tr:hover {
-            background-color: rgb(209 209 209);
+        .i8-table th {
+            padding: 14px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+            border-bottom: 2px solid #f1f5f9;
         }
 
-        .feed-item-title a {
-            color: #297aa9;
+        .i8-table td {
+            padding: 16px;
+            font-size: 14px;
+            color: #334155;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+
+        .i8-table tbody tr {
+            transition: background 0.15s ease;
+        }
+
+        .i8-table tbody tr:hover {
+            background: #f8fafc;
+        }
+
+        /* Badges */
+        .i8-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+        }
+
+        .i8-badge-draft { background: rgba(79, 70, 229, 0.1); color: var(--i8-primary); }
+        .i8-badge-published { background: rgba(16, 185, 129, 0.1); color: var(--i8-success); }
+        .i8-badge-trash { background: rgba(100, 116, 139, 0.1); color: #64748b; }
+
+        /* Priority Selector Dropdown */
+        .i8-priority-select {
+            padding: 6px 12px 6px 28px; /* پدینگ اضافه در سمت چپ برای آیکون فلش */
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid #cbd5e1;
+            transition: all 0.2s ease;
+            outline: none;
+            background-color: white;
+            appearance: none; /* حذف فلش پیش‌فرض مرورگر */
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: left 8px center;
+            background-size: 16px;
+        }
+
+        .i8-priority-select[data-val="high"] { background: rgba(239, 68, 68, 0.05); color: var(--i8-danger); border-color: rgba(239, 68, 68, 0.2); }
+        .i8-priority-select[data-val="medium"] { background: rgba(245, 158, 11, 0.05); color: var(--i8-warning); border-color: rgba(245, 158, 11, 0.2); }
+        .i8-priority-select[data-val="low"] { background: rgba(16, 185, 129, 0.05); color: var(--i8-success); border-color: rgba(16, 185, 129, 0.2); }
+
+        .i8-priority-select:focus {
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        /* Actions Cell */
+        .i8-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .i8-action-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e2e8f0;
+            background: white;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s ease;
             text-decoration: none !important;
         }
 
-
-        @keyframes blink {
-            0% {
-                background-color: #f0f0f1;
-            }
-
-            50% {
-                background-color: gold;
-            }
-
-            100% {
-                background-color: #f0f0f1;
-            }
+        .i8-action-icon:hover {
+            border-color: #cbd5e1;
+            color: var(--i8-neutral-800);
+            background: var(--i8-neutral-50);
         }
 
-        .blinking {
-            animation: blink 2s infinite;
-            filter: blur(1.2px);
+        .i8-action-icon-delete:hover {
+            border-color: rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.05);
+            color: var(--i8-danger);
         }
 
-        .scraped-feeds-table .tr:hover {
-            background-color: #eaf9ff;
+        /* Terminal Logs style */
+        .i8-terminal {
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            padding: 16px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 13px;
+            color: #cbd5e1;
+            max-height: 250px;
+            overflow-y: auto;
+            line-height: 1.6;
         }
 
-        /* pagination */
-        .tablenav-pages .page-numbers {
+        .i8-terminal-line {
+            margin-bottom: 8px;
             display: flex;
-            gap: 15px;
-            padding-left: 0;
+            gap: 12px;
         }
 
-        .tablenav .tablenav-pages li {
+        .i8-terminal-time {
+            color: #64748b;
+            user-select: none;
+        }
+
+        .i8-terminal-success { color: #34d399; }
+        .i8-terminal-danger { color: #f87171; }
+        .i8-terminal-info { color: #60a5fa; }
+
+        /* Error Recovery Box */
+        .i8-recovery-box {
+            background: rgba(245, 158, 11, 0.05);
+            border: 1px dashed var(--i8-warning);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
             display: flex;
-            flex-wrap: nowrap;
-            align-content: center;
-            justify-content: center;
-            min-width: 30px;
-            min-height: 30px;
-            margin: 0;
-            padding: 0 4px;
-            font-size: 16px;
-            line-height: 1.625;
-            text-align: center;
-            color: #000;
-            border: 3px solid #f2f2f2;
-            border-radius: 1px;
-
-        }
-
-        .tablenav .tablenav-pages li:hover {
-            background-color: #f2f2f2;
-
-        }
-
-        .tablenav .tablenav-pages li a {
-            text-decoration: none;
-            color: #297aa9;
-            width: 100%;
-            height: 100%;
-        }
-    </style>
-
-    <style>
-        .page_header {
-            display: flex;
-            flex-direction: row;
-            flex-wrap: wrap;
-            align-content: center;
             justify-content: space-between;
             align-items: center;
-        }
-
-        .page_info {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 24px;
-            background: #f0f0f1; /* Light gray background */
-            padding: 25px 35px;
-            border-radius: 16px;
-            box-shadow: 0 2px 12px #e2e7ff80;
-            font-size: 15px;
             width: 100%;
             box-sizing: border-box;
         }
 
-        .i8-flex-column {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            background: #fff;
-            border-radius: 12px;
-            padding: 18px 20px;
-            box-shadow: 0 1px 6px #e2e7ff40;
-            min-width: 260px;
-            flex: 1;
+        .i8-recovery-text p {
+            margin: 0;
+            font-size: 14px;
+            color: #78350f;
+            font-weight: 600;
         }
 
-        .i8-flex-column span, .i8-flex-column p {
-            font-size: 15px;
-            color: #444;
-            margin-bottom: 0;
-        }
-
-        .i8-flex-column span span:first-child {
-            color: #6c63ff;
-            font-weight: bold;
-        }
-
-        .i8-flex-column span span:last-child {
-            color: #297aa9;
-            font-weight: bold;
-        }
-
-        .small-font {
-            font-size: 13px;
+        .i8-recovery-text span {
+            font-size: 12px;
+            color: #92400e;
         }
     </style>
 
-    <div class="wrap d-flex flex-column gap-4">
-        <div class="page_header">
-            <div class="page_title">
-                <h1>صف انتشار</h1>
-                <p>صف انتشار پست های دستیار</p>
+    <div class="wrap i8-dashboard-wrap">
+        <!-- Header -->
+        <div class="i8-dashboard-header">
+            <div class="i8-title-sec">
+                <h1>صف زمان‌بندی و انتشار پست‌ها</h1>
+                <p class="description">داشبورد مانیتورینگ پردازش‌های در جریان، بررسی وضعیت صف‌ها و عیب‌یابی فعالیت‌ها</p>
             </div>
-            <div class="page_info">
-                <div class="i8-flex-column ">
-                    <span>
-                        <span>⏰  اجرای بعدی: </span>
-                        <span><?php
-                                try {
-                                    if (file_exists(COP_PLUGIN_DIR_PATH . '/library/jdatetime.class.php')) {
-                                        require_once(COP_PLUGIN_DIR_PATH . '/library/jdatetime.class.php');
-                                    }
-                                    
-                                    $recurrence = '-'; // Initialize recurrence
-                                    $recurrence_seconds = 0; // Initialize recurrence_seconds
-                                    $timestamp = null; // Initialize timestamp
-                                    
-                                    if (function_exists('as_next_scheduled_action') && function_exists('as_get_scheduled_actions')) {
-                                        $actions = as_get_scheduled_actions([
-                                            'hook'     => 'i8_action_publish_post_at_scheduling_table',
-                                            'status'   => (class_exists('ActionScheduler_Store') ? ActionScheduler_Store::STATUS_PENDING : 'pending'),
-                                            'per_page' => 1,
-                                            'orderby'  => 'scheduled_date',
-                                            'order'    => 'ASC',
-                                        ]);
-                                        
-                                        if (!empty($actions)) {
-                                            $action_id = array_key_first($actions);
-                                            $action = null;
-                                            if (class_exists('ActionScheduler') && method_exists('ActionScheduler', 'store')) {
-                                                $store = ActionScheduler::store();
-                                                if (method_exists($store, 'fetch_action')) {
-                                                    $action = $store->fetch_action($action_id);
-                                                }
-                                            }
-                                            
-                                            if ($action) {
-                                                $schedule = null;
-                                                if (method_exists($action, 'get_schedule')) {
-                                                    $schedule = $action->get_schedule();
-                                                }
-                                                
-                                                if ($schedule && is_object($schedule)) {
-                                     try {
-                                         $recurrence_seconds = safe_get_recurrence($schedule);
-                                         if ($recurrence_seconds) {
-                                             $recurrence = 'هر ' . ($recurrence_seconds / 60) . ' دقیقه';
-                                         }
-                                     } catch (Exception $e) {
-                                         // Ignore method call errors
-                                     }
-                                 }
-                                 
-                                 if ($schedule && is_object($schedule)) {
-                                     try {
-                                         $scheduled_date = safe_get_schedule_date($schedule);
-                                         if ($scheduled_date && is_object($scheduled_date) && method_exists($scheduled_date, 'getTimestamp')) {
-                                             $timestamp = $scheduled_date->getTimestamp();
-                                             date_default_timezone_set('Asia/Tehran');
-                                         }
-                                     } catch (Exception $e) {
-                                         // Ignore method call errors
-                                     }
-                                 }
-                                            }
-                                        }
-                                        
-                                        if ($timestamp) {
-                                            // Get cron working hours
-                            $start_cron_time = safe_get_option('start_cron_time');
-                             $end_cron_time = safe_get_option('end_cron_time');
+            <div>
+                <button onclick="location.reload();" class="i8-btn i8-btn-secondary">🔄 به‌روزرسانی صفحه</button>
+            </div>
+        </div>
 
-                                            // Adjust timestamp based on working hours (simplified logic)
-                                            if ($start_cron_time && $end_cron_time) {
-                                                $today = date('Y-m-d', $timestamp);
-                                                $start_today_timestamp = strtotime($today . ' ' . $start_cron_time);
-                                                $end_today_timestamp = strtotime($today . ' ' . $end_cron_time);
+        <!-- System Alerts / Recovery -->
+        <?php
+        try {
+            $has_scheduler = function_exists('as_next_scheduled_action');
+            $timestamp = null;
+            $recurrence = '-';
+            $recurrence_seconds = 0;
 
-                                                // Simple working hours check - no overnight logic
-                                                if ($timestamp < $start_today_timestamp) {
-                                                    $timestamp = $start_today_timestamp;
-                                                } elseif ($timestamp > $end_today_timestamp) {
-                                                    $timestamp = $start_today_timestamp + 86400;
-                                                }
-                                            }
-
-                                            // Check if jDateTime class exists before using it
-                                            if (class_exists('i8_jDateTime')) {
-                                                // Validate timestamp before using with jDateTime
-                                                if (empty($timestamp) || !is_numeric($timestamp) || $timestamp <= 0) {
-                                                    echo '❌ زمان نامعتبر برای نمایش';
-                                                } else {
-                                                    $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
-                                                    $jalali_date = $jdate->date('Y/m/d H:i:s', $timestamp);
-
-                                                    $today_gregorian = date('Y-m-d');
-                                                    $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
-                                                    $scheduled_day_gregorian = date('Y-m-d', $timestamp);
-
-                                                    $display_date = '';
-                                                    if ($scheduled_day_gregorian == $today_gregorian) {
-                                                        $display_date = 'امروز ساعت ' . $jdate->date('H:i', $timestamp);
-                                                    } elseif ($scheduled_day_gregorian == $tomorrow_gregorian) {
-                                                        $display_date = 'فردا ساعت ' . $jdate->date('H:i', $timestamp);
-                                                    } else {
-                                                        $display_date = $jdate->date('Y/m/d H:i', $timestamp);
-                                                    }
-                                                    echo '<span title="' . safe_esc_attr($jalali_date) . '">' . $display_date . '</span>';
-                                                }
-                                            } else {
-                                                // Fallback to Gregorian date if jDateTime class is not available
-                                                if (!empty($timestamp) && is_numeric($timestamp) && $timestamp > 0) {
-                                                    echo date('Y-m-d H:i', $timestamp);
-                                                } else {
-                                                    echo '❌ زمان نامعتبر';
-                                                }
-                                            }
-                                        } else {
-                                            $is_running = false;
-                                            if (function_exists('as_get_scheduled_actions')) {
-                                                $running_actions = as_get_scheduled_actions([
-                                                    'hook'     => 'i8_action_publish_post_at_scheduling_table',
-                                                    'status'   => (class_exists('ActionScheduler_Store') ? ActionScheduler_Store::STATUS_RUNNING : 'in-progress'),
-                                                    'per_page' => 1,
-                                                ]);
-                                                if (!empty($running_actions)) {
-                                                    $is_running = true;
-                                                }
-                                            }
-
-                                            if ($is_running) {
-                                                echo '<span style="color: #0073aa; font-weight: bold; background: #e5f5fa; padding: 4px 10px; border-radius: 4px; border: 1px solid #0073aa;">⏳ در حال اجرا و انتشار (لطفاً کمی صبر کنید)...</span>';
-                                            } else {
-                                                echo '<div style="background: #fff2cc; border: 1px solid #d69e2e; border-radius: 4px; padding: 15px; margin: 10px 0;">';
-                                                echo '<p style="color: #d63638; font-weight: bold; margin: 0 0 10px 0;">❌ هیچ اجرای برنامه‌ریزی‌شده‌ای برای این هوک پیدا نشد.</p>';
-                                                echo '<p style="color: #666; font-size: 14px; margin: 0 0 15px 0;">این مشکل ممکن است به دلایل زیر رخ دهد:</p>';
-                                                echo '<ul style="color: #666; font-size: 14px; margin: 0 0 15px 20px;">';
-                                                echo '<li>Action Scheduler به طور خودکار action را حذف کرده است</li>';
-                                                echo '<li>خطا در تابع اصلی برنامه‌ریزی رخ داده است</li>';
-                                                echo '<li>تنظیمات زمانی نادرست است</li>';
-                                                echo '<li>مشکل در پلاگین Action Scheduler</li>';
-                                                echo '</ul>';
-                                                echo '<button onclick="i8_recreate_scheduled_action()" style="background: #0073aa; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">🔄 بازیابی خودکار</button>';
-                                                echo '<p style="color: #666; font-size: 12px; margin: 10px 0 0 0;">💡 اگر مشکل ادامه داشت، تنظیمات زمان شروع و پایان را بررسی کنید.</p>';
-                                                echo '</div>';
-                                            }
-                                        }
-                                    } else {
-                                        echo '❌ این افزونه برای استفاده از این قابلیت باید افزونه اکشن اسکدر را نصب کنید.';
-                                    }
-                                } catch (Exception $e) {
-                                    echo '❌ خطا در نمایش زمان اجرای بعدی: ' . safe_esc_html($e->getMessage());
-                                }
-                                ?></span>
-                    </span>
-                    <p>
-                        <span>📰 تعداد خبرهای امروز:</span>
-                        <span><?php echo safe_get_option('daily_post_count_for_schedule', '-'); ?></span>
-                    </p>
-                    <p>
-                        <span>⏱️ فاصله انتشار خبرها:</span>
-                        <span><?php echo isset($recurrence) ? $recurrence : '-'; ?></span>
-                    </p>
-                </div>
-                <div class="i8-flex-column">
-                    <p>
-                        <span>📝 جمع کل اخبار در صف:</span>
-                        <span><?php echo isset($results) ? count($results) : '-'; ?></span>
-                    </p>
-                    <p>
-                        <span>▶️ ساعت شروع ربات:</span>
-                        <span><?php echo safe_get_option('start_cron_time', '-'); ?></span>
-                    </p>
-                    <p>
-                        <span>⏹️ ساعت پایان ربات:</span>
-                        <span><?php echo safe_get_option('end_cron_time', '-'); ?></span>
-                    </p>
-
-                    <small style="font-size: 12px; color: #777;">ساعات انتشار تقریبی هستند و ممکن است کمی تاخیر یا تقدم داشته باشند.</small>
-                </div>
-                <div class="i8-flex-column">
-                    <?php
-                    if (!empty($post_publish_priority)) {
-                        // Reorder priorities to display high, medium, then low
-                        $ordered_priorities = [];
-                        foreach ($post_publish_priority as $item) {
-                            $ordered_priorities[$item->publish_priority] = $item;
+            if ($has_scheduler) {
+                $actions = as_get_scheduled_actions([
+                    'hook'     => 'i8_action_publish_post_at_scheduling_table',
+                    'status'   => (class_exists('ActionScheduler_Store') ? ActionScheduler_Store::STATUS_PENDING : 'pending'),
+                    'per_page' => 1,
+                    'orderby'  => 'scheduled_date',
+                    'order'    => 'ASC',
+                ]);
+                
+                if (!empty($actions)) {
+                    $action_id = array_key_first($actions);
+                    $action = null;
+                    if (class_exists('ActionScheduler') && method_exists('ActionScheduler', 'store')) {
+                        $store = ActionScheduler::store();
+                        if (method_exists($store, 'fetch_action')) {
+                            $action = $store->fetch_action($action_id);
                         }
-
-                        $display_order = ['high', 'medium', 'low'];
-
-                        foreach ($display_order as $priority_key) {
-                            if (isset($ordered_priorities[$priority_key])) {
-                                $priority_item = $ordered_priorities[$priority_key];
-                                $emoji = '';
-                                switch ($priority_item->publish_priority) {
-                                    case 'high':
-                                        $emoji = '🔥 '; // Fire emoji for high priority
-                                        break;
-                                    case 'medium':
-                                        $emoji = '⚠️ '; // Warning emoji for medium priority
-                                        break;
-                                    case 'low':
-                                        $emoji = '✅ '; // Checkmark emoji for low priority
-                                        break;
-                                }
-                                echo '<p><span>' . $emoji . post_priority_persian($priority_item->publish_priority) . ':</span> <span>' . $priority_item->count . '</span></p>';
+                    }
+                    
+                    if ($action) {
+                        $schedule = method_exists($action, 'get_schedule') ? $action->get_schedule() : null;
+                        if ($schedule && is_object($schedule)) {
+                            $recurrence_seconds = safe_get_recurrence($schedule);
+                            if ($recurrence_seconds) {
+                                $recurrence = 'هر ' . i8_to_persian_num(round($recurrence_seconds / 60, 1)) . ' دقیقه';
+                            }
+                            $scheduled_date = safe_get_schedule_date($schedule);
+                            if ($scheduled_date && is_object($scheduled_date) && method_exists($scheduled_date, 'getTimestamp')) {
+                                $timestamp = $scheduled_date->getTimestamp();
                             }
                         }
                     }
+                }
+            }
+
+            if (!$timestamp && $has_scheduler) {
+                $is_running = false;
+                $running_actions = as_get_scheduled_actions([
+                    'hook'     => 'i8_action_publish_post_at_scheduling_table',
+                    'status'   => (class_exists('ActionScheduler_Store') ? ActionScheduler_Store::STATUS_RUNNING : 'in-progress'),
+                    'per_page' => 1,
+                ]);
+                if (!empty($running_actions)) {
+                    $is_running = true;
+                }
+
+                if ($is_running) {
+                    echo '<div class="i8-badge i8-badge-medium mb-3 p-3 w-100 text-center d-block">⏳ در حال اجرا و انتشار (لطفاً کمی صبر کنید)...</div>';
+                } else {
                     ?>
+                    <div class="i8-recovery-box">
+                        <div class="i8-recovery-text">
+                            <p>⚠️ تسک زمان‌بندی موتور انتشار غیرفعال است</p>
+                            <span>سیستم زمان‌بندی Action Scheduler برای اجرای خودکار یافت نشد.</span>
+                        </div>
+                        <button onclick="i8_recreate_scheduled_action()" class="i8-btn i8-btn-primary">🔄 راه‌اندازی و بازیابی خودکار</button>
+                    </div>
+                    <?php
+                }
+            }
+        } catch (Exception $e) {
+            echo '<div class="notice notice-error"><p>خطا در بازیابی وضعیت صف: ' . safe_esc_html($e->getMessage()) . '</p></div>';
+        }
+        ?>
+
+        <!-- Stats Grid -->
+        <div class="i8-stats-grid">
+            <!-- Card 1 -->
+            <div class="i8-stat-card">
+                <div class="i8-stat-icon i8-bg-primary">⏰</div>
+                <div class="i8-stat-info">
+                    <span class="i8-stat-label">اجرای بعدی صف انتشار</span>
+                    <span class="i8-stat-value">
+                        <?php
+                        if ($timestamp) {
+                            $orig_tz = date_default_timezone_get();
+                            date_default_timezone_set('Asia/Tehran');
+                            if (class_exists('i8_jDateTime')) {
+                                $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
+                                $today_gregorian = date('Y-m-d');
+                                $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
+                                $scheduled_day_gregorian = date('Y-m-d', $timestamp);
+
+                                if ($scheduled_day_gregorian == $today_gregorian) {
+                                    echo 'امروز ساعت ' . i8_to_persian_num($jdate->date('H:i', $timestamp));
+                                } elseif ($scheduled_day_gregorian == $tomorrow_gregorian) {
+                                    echo 'فردا ساعت ' . i8_to_persian_num($jdate->date('H:i', $timestamp));
+                                } else {
+                                    echo i8_to_persian_num($jdate->date('Y/m/d H:i', $timestamp));
+                                }
+                            } else {
+                                echo i8_to_persian_num(date('Y-m-d H:i', $timestamp));
+                            }
+                            date_default_timezone_set($orig_tz);
+                        } else {
+                            echo 'غیرفعال';
+                        }
+                        ?>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="i8-stat-card">
+                <div class="i8-stat-icon i8-bg-success">📋</div>
+                <div class="i8-stat-info">
+                    <span class="i8-stat-label">تعداد کل اخبار در صف</span>
+                    <span class="i8-stat-value"><?php echo i8_to_persian_num(count($results)); ?> پست</span>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="i8-stat-card">
+                <div class="i8-stat-icon i8-bg-warning">⚡</div>
+                <div class="i8-stat-info">
+                    <span class="i8-stat-label">ساعت کار ربات / فاصله انتشار</span>
+                    <span class="i8-stat-value">
+                        <?php 
+                        $start_time = safe_get_option('start_cron_time', '08:00');
+                        $end_time = safe_get_option('end_cron_time', '22:00');
+                        echo i8_to_persian_num($start_time) . ' تا ' . i8_to_persian_num($end_time); 
+                        ?>
+                        <span class="small-font text-secondary" style="font-size: 13px; color: #64748b;">(<?php echo $recurrence; ?>)</span>
+                    </span>
                 </div>
             </div>
         </div>
 
-        <div class="post-list">
-            <div class="table table-hover px-3 ">
-                <div class="row d-none d-md-flex">
-                    <div class="th col col-auto"> نوبت </div>
-                    <div class="col col-9 col-md-11 row ">
-                        <div class="th col col-12 col-xl-7">عنوان</div>
-                        <div class="th col col-4 col-xl-1  d-none d-md-flex">اولویت</div>
-                        <div class="th col col-4 col-xl-1  d-none d-md-flex">زمان انتشار</div>
-                        <div class="th col col-8 col-xl-1  d-none d-md-flex">وضعیت</div>
-                        <div class="th col col-8 col-xl-1  d-none d-md-flex">نویسنده</div>
-                        <div class="th col col-12 col-xl-2 d-none d-md-flex"></div>
-                    </div>
-                </div>
-
-
-                <?php
-                if ($results && isset($timestamp)):
-                    $first_publishe_time_timestamp = $timestamp;
-                    $counter = 0;
-                    foreach ($results as $key => $item):
-
-                ?>
-                        <div class="tr row p-2" id="item-<?php echo $item->id; ?>">
-                            <div class="col-auto bg-transparent row-counter"><?php echo $key + 1; ?></div>
-                            <div class="col-11 row bg-transparent">
-                                <div class="col-12 col-xl-7 bg-transparent feed-item-title">
-                                    <a href="<?php echo safe_get_edit_post_link($item->post_id); ?>" target="_blank"><?php echo safe_get_the_title($item->post_id); ?></a>
-                                </div>
-                                <div class="col-4 col-xl-1 bg-transparent text-secondary item-meta-data">
-
+        <!-- Main Posts Table -->
+        <div class="i8-card">
+            <h2 class="i8-card-title">📰 پست‌های در انتظار انتشار نوبتی (حداکثر ۱۰۰ مورد اخیر)</h2>
+            <div class="i8-table-wrapper">
+                <table class="i8-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">نوبت</th>
+                            <th>عنوان خبر</th>
+                            <th>اولویت انتشار</th>
+                            <th>زمان تقریبی انتشار</th>
+                            <th>وضعیت فعلی</th>
+                            <th>نویسنده</th>
+                            <th style="text-align: left; width: 120px;">عملیات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        if ($results):
+                            $counter = 0;
+                            foreach ($results as $key => $item):
+                                $post_id = $item->post_id;
+                                $post_status = safe_get_post_status($post_id);
+                        ?>
+                            <tr id="item-<?php echo $item->id; ?>">
+                                <td><strong><?php echo i8_to_persian_num($key + 1); ?></strong></td>
+                                <td>
+                                    <a href="<?php echo safe_get_edit_post_link($post_id); ?>" target="_blank" style="color: var(--i8-primary); text-decoration: none; font-weight: 600;">
+                                        <?php echo safe_get_the_title($post_id); ?>
+                                    </a>
+                                </td>
+                                <td>
+                                    <select class="i8-priority-select" data-id="<?php echo $item->id; ?>" data-val="<?php echo esc_attr($item->publish_priority); ?>">
+                                        <option value="high" <?php selected($item->publish_priority, 'high'); ?>>🔥 اولویت بالا</option>
+                                        <option value="medium" <?php selected($item->publish_priority, 'medium'); ?>>⚠️ اولویت متوسط</option>
+                                        <option value="low" <?php selected($item->publish_priority, 'low'); ?>>✅ اولویت پایین</option>
+                                    </select>
+                                </td>
+                                <td>
                                     <?php
-                                    $priority = $item->publish_priority;
-                                    echo post_priority_persian($priority);
-
-                                    ?></span>
-                                </div>
-                                <div class="col-4 col-xl-1 bg-transparent text-secondary item-meta-data">
-                                    <?php
-                                    try {
-                                        date_default_timezone_set('Asia/Tehran');
-                                        
-                                        // Validate timestamp before using it
-                                        if (empty($timestamp) || !is_numeric($timestamp) || $timestamp <= 0) {
-                                            echo '❌ زمان نامعتبر';
-                                            continue;
-                                        }
-                                        
+                                    if ($timestamp) {
                                         $post_scheduled_timestamp = $timestamp;
-                                        if ($counter >= 1 && isset($recurrence_seconds) && $recurrence_seconds > 0) {
-                                            $step = ($recurrence_seconds * $counter);
-                                            $post_scheduled_timestamp = ($timestamp + $step);
+                                        if ($counter >= 1 && $recurrence_seconds > 0) {
+                                            $post_scheduled_timestamp = $timestamp + ($recurrence_seconds * $counter);
                                         }
-
-                                        // Additional validation for calculated timestamp
-                                        if (empty($post_scheduled_timestamp) || !is_numeric($post_scheduled_timestamp) || $post_scheduled_timestamp <= 0) {
-                                            echo '❌ زمان محاسبه شده نامعتبر';
-                                            continue;
-                                        }
-
+                                        
+                                        $orig_tz = date_default_timezone_get();
+                                        date_default_timezone_set('Asia/Tehran');
                                         if (class_exists('i8_jDateTime')) {
                                             $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
-                                            $jalali_post_date = $jdate->date('Y/m/d H:i:s', $post_scheduled_timestamp);
-
                                             $today_gregorian = date('Y-m-d');
                                             $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
                                             $scheduled_post_day_gregorian = date('Y-m-d', $post_scheduled_timestamp);
 
-                                            $display_post_date = '';
                                             if ($scheduled_post_day_gregorian == $today_gregorian) {
-                                                $display_post_date = 'امروز ساعت ' . $jdate->date('H:i', $post_scheduled_timestamp);
+                                                echo 'امروز ساعت ' . i8_to_persian_num($jdate->date('H:i', $post_scheduled_timestamp));
                                             } elseif ($scheduled_post_day_gregorian == $tomorrow_gregorian) {
-                                                $display_post_date = 'فردا ساعت ' . $jdate->date('H:i', $post_scheduled_timestamp);
+                                                echo 'فردا ساعت ' . i8_to_persian_num($jdate->date('H:i', $post_scheduled_timestamp));
                                             } else {
-                                                $display_post_date = $jdate->date('Y/m/d H:i', $post_scheduled_timestamp, true, true);
+                                                echo i8_to_persian_num($jdate->date('Y/m/d H:i', $post_scheduled_timestamp));
                                             }
-                                            echo '<span title="' . safe_esc_attr($jalali_post_date) . '">' . $display_post_date . '</span>';
                                         } else {
-                                            // Fallback to Gregorian date if jDateTime class is not available
-                                            echo date('Y-m-d H:i', $post_scheduled_timestamp);
+                                            echo i8_to_persian_num(date('Y-m-d H:i', $post_scheduled_timestamp));
                                         }
-                                        
+                                        date_default_timezone_set($orig_tz);
                                         $counter++;
-                                    } catch (Exception $e) {
-                                        echo '❌ خطا در نمایش تاریخ';
+                                    } else {
+                                        echo '-';
                                     }
                                     ?>
-                                </div>
-                                <div class="col-8 col-xl-1 bg-transparent text-secondary item-meta-data" style="direction:left">
+                                </td>
+                                <td>
                                     <?php
-                                    $post_status = safe_get_post_status($item->post_id);
-                                    switch ($post_status) {
-                                        case 'draft':
-                                            echo '<span class="text-primary">' . 'پیش نویس' . '</span>';
-                                            break;
-                                        case 'publish':
-                                            echo '<span class="text-danger"> ' .
-                                                ' <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-exclamation-triangle" viewBox="0 0 16 16"><path d="M7.938 2.016A.13.13 0 0 1 8.002 2a.13.13 0 0 1 .063.016.15.15 0 0 1 .054.057l6.857 11.667c.036.06.035.124.002.183a.2.2 0 0 1-.054.06.1.1 0 0 1-.066.017H1.146a.1.1 0 0 1-.066-.017.2.2 0 0 1-.054-.06.18.18 0 0 1 .002-.183L7.884 2.073a.15.15 0 0 1 .054-.057m1.044-.45a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767z"/><path d="M7.002 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 5.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/></svg>'
-                                                . ' منتشر شده '
-                                                . '</span>';
-                                            break;
-                                        case 'pending':
-                                            echo '<span class="text-danger">' . 'در انتظار بررسی' . '</span>';
-                                            break;
-                                        case 'future':
-                                            echo '<span class="text-danger">' . 'زمانبدی شده' . '</span>';
-                                            break;
-                                        case 'trash':
-                                            echo '<span class="text-danger">' . 'حذف شده' . '</span>';
-                                            break;
-                                        default:
-                                            echo $post_status;
-                                    }
+                                    $s_class = 'i8-badge-draft';
+                                    $s_text = 'پیش‌نویس';
+                                    if ($post_status === 'publish') { $s_class = 'i8-badge-published'; $s_text = 'منتشر شده'; }
+                                    elseif ($post_status === 'trash') { $s_class = 'i8-badge-trash'; $s_text = 'زباله‌دان'; }
+                                    echo '<span class="i8-badge ' . $s_class . '">' . $s_text . '</span>';
                                     ?>
-                                </div>
-                                <div class="col-8 col-xl-1 bg-transparent text-secondary item-meta-data" style="direction:left">
-                                    <?php echo safe_get_author_name($item->post_id); ?>
-                                </div>
-                                <div class="col-12 col-xl-2 row gap-2 bg-transparent action-bar">
-                                    <a class="col btn btn-sm rounded-pill btn-outline-secondary" title="ویرایش فید" target="_blank"
-                                        href="<?php echo safe_get_edit_post_link($item->post_id); ?>">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                                            class="bi bi-pencil-square" viewBox="0 0 16 16">
-                                            <path
-                                                d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z" />
-                                            <path fill-rule="evenodd"
-                                                d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z" />
-                                        </svg>
-                                    </a>
-                                    <a class="col btn btn-sm rounded-pill btn-outline-secondary " title="نمایش فید" target="_blank"
-                                        href="<?php echo safe_get_permalink($item->post_id); ?>">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                                            class="bi bi-box-arrow-up-right" viewBox="0 0 16 16">
-                                            <path fill-rule="evenodd"
-                                                d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5" />
-                                            <path fill-rule="evenodd"
-                                                d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z" />
-                                        </svg>
-                                    </a>
-                                    <a class="delete-link col btn btn-sm rounded-pill btn-outline-danger"
-                                        id="item-<?php echo $item->id; ?>" data-id="<?php echo $item->id; ?>">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                                            class="bi bi-bookmark-x" viewBox="0 0 16 16">
-                                            <path fill-rule="evenodd"
-                                                d="M6.146 5.146a.5.5 0 0 1 .708 0L8 6.293l1.146-1.147a.5.5 0 1 1 .708.708L8.707 7l1.147 1.146a.5.5 0 0 1-.708.708L8 7.707 6.854 8.854a.5.5 0 1 1-.708-.708L7.293 7 6.146 5.854a.5.5 0 0 1 0-.708">
-                                            </path>
-                                            <path
-                                                d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z">
-                                            </path>
-                                        </svg>
-                                    </a>
+                                </td>
+                                <td><?php echo safe_get_author_name($post_id); ?></td>
+                                <td>
+                                    <div class="i8-actions">
+                                        <a href="<?php echo safe_get_edit_post_link($post_id); ?>" class="i8-action-icon" title="ویرایش پست" target="_blank">📝</a>
+                                        <a href="<?php echo safe_get_permalink($post_id); ?>" class="i8-action-icon" title="نمایش پست" target="_blank">🔗</a>
+                                        <button class="i8-action-icon i8-action-icon-delete delete-link" data-id="<?php echo $item->id; ?>" title="حذف از صف">❌</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php
+                            endforeach;
+                        else:
+                        ?>
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 40px; color: #64748b;">
+                                    📭 در حال حاضر هیچ پستی در صف زمان‌بندی وجود ندارد.
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-                                </div>
-                            </div>
-                        </div>
+        <!-- Terminal Logs Widget -->
+        <div class="i8-card">
+            <h2 class="i8-card-title">🖥️ آخرین گزارش فعالیت‌های موتور انتشار</h2>
+            <div class="i8-terminal">
                 <?php
-
-                    endforeach;
-                endif;
+                if (function_exists('display_rss_reports')) {
+                    $all_reports = display_rss_reports();
+                    if (!empty($all_reports)) {
+                        // فیلتر کردن لاگ‌ها جهت نمایش اختصاصی موارد مربوط به انتشار پست‌ها
+                        $publishing_logs = array();
+                        foreach ($all_reports as $log) {
+                            if ($log['action_title'] === 'انتشار پست زمان‌بندی شده') {
+                                $publishing_logs[] = $log;
+                            }
+                        }
+                        
+                        $logs_slice = array_slice($publishing_logs, 0, 15);
+                        foreach ($logs_slice as $log) {
+                            $time_display = date('H:i:s', strtotime($log['pub_date']));
+                            $status_class = ($log['status'] == 0) ? 'i8-terminal-danger' : 'i8-terminal-success';
+                            $status_badge = ($log['status'] == 0) ? '[ERROR]' : '[SUCCESS]';
+                            
+                            // واکشی عنوان پست و کوتاه کردن آن جهت تعادل بصری در ترمینال لاگ
+                            $post_title = safe_get_the_title($log['resource_id']);
+                            $truncated_title = mb_substr($post_title, 0, 40);
+                            if (mb_strlen($post_title) > 40) {
+                                $truncated_title .= '...';
+                            }
+                            $post_identifier = sprintf('پست #%d (%s)', $log['resource_id'], $truncated_title);
+                            ?>
+                            <div class="i8-terminal-line">
+                                <span class="i8-terminal-time">[<?php echo i8_to_persian_num($time_display); ?>]</span>
+                                <span class="<?php echo $status_class; ?>"><?php echo $status_badge; ?></span>
+                                <span style="color: #38bdf8; font-weight: 600;"><?php echo safe_esc_html($post_identifier); ?>:</span>
+                                <span><?php echo i8_to_persian_num(safe_esc_html($log['error_msg'])); ?></span>
+                            </div>
+                            <?php
+                        }
+                        if (empty($publishing_logs)) {
+                            echo '<div class="text-secondary">هیچ فعالیت انتشاری تاکنون ثبت نشده است.</div>';
+                        }
+                    } else {
+                        echo '<div class="text-secondary">هیچ لاگ یا فعالیتی ثبت نشده است.</div>';
+                    }
+                } else {
+                    echo '<div class="text-secondary">تابع گزارشات در دسترس نیست.</div>';
+                }
                 ?>
-
             </div>
         </div>
     </div>
 
     <script>
         jQuery(document).ready(function($) {
-            $('.delete-link').click(function(e) {
-                e.preventDefault();
-                var itemId = $(this).data('id'); // دریافت ID از attribute data-id
+            // تغییر داینامیک استایل در هنگام تغییر اولویت‌ها
+            $('.i8-priority-select').change(function() {
+                var select = $(this);
+                var itemId = select.data('id');
+                var priority = select.val();
 
                 $.ajax({
-                    url: ajaxurl, // این متغیر توسط وردپرس تعریف شده است
+                    url: ajaxurl,
                     type: 'POST',
                     data: {
-                        action: 'delete_item', // این نام عملیات است که در PHP تعریف می‌کنیم
-                        id: itemId
+                        action: 'update_priority',
+                        id: itemId,
+                        priority: priority
                     },
                     dataType: 'json',
-                    success: function(response) {
-                        var query_status = response.status;
-                        delete_html_list_item(query_status, itemId);
-                        // alert(response.message);
+                    beforeSend: function() {
+                        select.css('opacity', '0.5').prop('disabled', true);
                     },
-                    error: function(response) {
-                        alert('مشکلی پیش امد')
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            select.attr('data-val', priority);
+                            // یک افکت فلش سبز رنگ کوچک برای تایید تغییر
+                            select.css('border-color', '#10b981');
+                            setTimeout(function() {
+                                location.reload(); // رفرش صفحه برای اعمال اولویت جدید و مرتب‌سازی مجدد صف
+                            }, 400);
+                        } else {
+                            alert('❌ خطا: ' + response.message);
+                        }
+                    },
+                    error: function() {
+                        alert('❌ مشکلی در ارتباط با سرور پیش آمد.');
+                    },
+                    complete: function() {
+                        select.css('opacity', '1').prop('disabled', false);
                     }
                 });
+            });
 
-                function delete_html_list_item(query_status, itemId) {
-                    if (query_status == 'success') {
-                        $('#item-' + itemId).toggle("slow", function() {
-                            $(this).remove();
-                        });
-                    }
+            $('.delete-link').click(function(e) {
+                e.preventDefault();
+                var itemId = $(this).data('id');
+                var button = $(this);
+
+                if (confirm('آیا از حذف این آیتم از صف انتشار اطمینان دارید؟')) {
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'delete_item',
+                            id: itemId
+                        },
+                        dataType: 'json',
+                        beforeSend: function() {
+                            button.prop('disabled', true).text('⏳');
+                        },
+                        success: function(response) {
+                            if (response.status === 'success') {
+                                $('#item-' + itemId).fadeOut("slow", function() {
+                                    $(this).remove();
+                                    if ($('.i8-table tbody tr').length === 0) {
+                                        $('.i8-table tbody').append('<tr><td colspan="7" style="text-align: center; padding: 40px; color: #64748b;">📭 در حال حاضر هیچ پستی در صف زمان‌بندی وجود ندارد.</td></tr>');
+                                    }
+                                });
+                            } else {
+                                alert('❌ خطا: ' + response.message);
+                                button.prop('disabled', false).text('❌');
+                            }
+                        },
+                        error: function() {
+                            alert('❌ مشکلی در ارتباط با سرور پیش آمد.');
+                            button.prop('disabled', false).text('❌');
+                        }
+                    });
                 }
-
             });
             
-            // تابع بازیابی خودکار scheduled action
             window.i8_recreate_scheduled_action = function() {
                 $.ajax({
                     url: ajaxurl,
@@ -786,7 +902,7 @@ function pc_schedule_queue_page_callback()
                     },
                     success: function(response) {
                         if (response.success) {
-                            alert('✅ scheduled action با موفقیت بازیابی شد!');
+                            alert('✅ موتور زمان‌بندی با موفقیت بازیابی و فعال شد!');
                             location.reload();
                         } else {
                             alert('❌ خطا در بازیابی: ' + response.message);
@@ -802,8 +918,5 @@ function pc_schedule_queue_page_callback()
             };
         });
     </script>
-
 <?php
-
-
 }

@@ -3,14 +3,19 @@
 // add action for active plugin and update option
 add_action('i8_action_set_cron_job_publishe_posts', 'i8_set_cron_job_publishe_posts');
 
-// مکانیزم خودکار بررسی وجود scheduled action
+// مکانیزم خودکار بررسی وجود scheduled action و مهاجرت داده‌ها
 function i8_ensure_scheduled_action_exists() {
     // بررسی اینکه آیا Action Scheduler فعال است
     if (!function_exists('as_next_scheduled_action')) {
         return;
     }
     
-    // بررسی وجود scheduled action
+    // مهاجرت پست‌های قدیمی به صف جدید Action Scheduler
+    if (function_exists('i8_migrate_old_queue_to_action_scheduler')) {
+        i8_migrate_old_queue_to_action_scheduler();
+    }
+    
+    // بررسی وجود scheduled action قدیمی
     $next_scheduled = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table');
     
     if (!$next_scheduled) {

@@ -19,3 +19,5 @@ require_once __DIR__ . '/functions/crons.php';
 require_once __DIR__ . '/functions/scraper.php';
 require_once __DIR__ . '/functions/report.php';
 require_once __DIR__ . '/functions/template.php';
+require_once __DIR__ . '/functions/monitoring.php';
+

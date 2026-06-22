@@ -42,6 +42,8 @@ include_once (plugin_dir_path(__FILE__) . '/admin-pages/schedule-queue.php');
 
 include_once (plugin_dir_path(__FILE__) . '/inc/scraper/index.php');
 include_once (plugin_dir_path(__FILE__) . '/inc/report/index.php');
+include_once (plugin_dir_path(__FILE__) . '/admin-pages/monitoring_page.php');
+
 
 include_once (plugin_dir_path(__FILE__) . '/inc/db.php');
 

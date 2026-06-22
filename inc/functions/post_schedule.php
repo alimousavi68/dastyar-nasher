@@ -1,5 +1,34 @@
 <?php
 
+// Track the active action ID of Action Scheduler
+global $i8_current_action_id;
+$i8_current_action_id = null;
+
+if (function_exists('add_action')) {
+    add_action('action_scheduler_begin_execute', function($action_id) {
+        global $i8_current_action_id;
+        $i8_current_action_id = $action_id;
+    });
+
+    add_action('action_scheduler_after_execute', function($action_id) {
+        global $i8_current_action_id;
+        if ($i8_current_action_id === $action_id) {
+            $i8_current_action_id = null;
+        }
+    });
+}
+
+/**
+ * ثبت لاگ در دیتابیس Action Scheduler برای اکشن در حال اجرا
+ */
+function i8_action_log($message) {
+    global $i8_current_action_id;
+    if ($i8_current_action_id && class_exists('ActionScheduler') && is_callable(array('ActionScheduler', 'logger'))) {
+        ActionScheduler::logger()->log($i8_current_action_id, $message);
+    }
+    error_log('i8 Action Scheduler: ' . $message);
+}
+
 // Recive Ajax request and manage it
 if (isset($_POST['action']) && !empty($_POST['action'])) {
     if ($_POST['action'] == 'delete_item') {
@@ -8,6 +37,29 @@ if (isset($_POST['action']) && !empty($_POST['action'])) {
 
         $response = i8_delete_item_at_scheulde_list($item_id);
         echo json_encode($response);
+        wp_die();
+    } elseif ($_POST['action'] == 'update_priority') {
+        $item_id = intval($_POST['id']);
+        $priority = sanitize_text_field($_POST['priority']);
+        
+        if (!in_array($priority, array('high', 'medium', 'low'))) {
+            echo json_encode(array('status' => 'error', 'message' => 'اولویت نامعتبر است.'));
+            wp_die();
+        }
+        
+        global $wpdb;
+        $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
+        $updated = $wpdb->update(
+            $table_post_schedule,
+            array('publish_priority' => $priority),
+            array('id' => $item_id)
+        );
+        
+        if ($updated !== false) {
+            echo json_encode(array('status' => 'success', 'message' => 'اولویت با موفقیت به‌روزرسانی شد.'));
+        } else {
+            echo json_encode(array('status' => 'error', 'message' => 'خطا در به‌روزرسانی اولویت.'));
+        }
         wp_die();
     }
 }
@@ -103,6 +155,14 @@ function add_post_to_post_schedule_table($post_id, $post_priority)
             'publish_priority' => $post_priority
         )
     );
+
+    // ثبت به عنوان اکشن تکی در Action Scheduler
+    if (function_exists('as_schedule_single_action')) {
+        $slot = i8_get_next_available_publishing_slot();
+        $adjusted_slot = i8_adjust_timestamp_to_working_hours($slot);
+        as_schedule_single_action($adjusted_slot, 'i8_action_publish_specific_post', array('post_id' => $post_id), 'i8_post_publisher');
+        i8_action_log(sprintf('پست %d مستقیماً زمان‌بندی شد در Action Scheduler برای زمان: %s', $post_id, date('Y-m-d H:i:s', $adjusted_slot)));
+    }
 }
 
 // check post exist in post schedul table and retrive post priority
@@ -156,8 +216,6 @@ function i8_change_post_status($priority_posts)
         $post_status = get_post_status($post_id);
 
         if ($post_status == 'draft') {
-            // //error_log('npost is draf and publishe it');
-
             date_default_timezone_set('Asia/Tehran');
 
             // بجای قرار دادن در حالت future، مستقیما منتشر میکنیم تا جلوی انباشت و تاخیر گرفته شود
@@ -167,17 +225,22 @@ function i8_change_post_status($priority_posts)
                 'post_date' => current_time('mysql'),
                 'post_date_gmt' => current_time('mysql', 1),
             );
-            wp_update_post($post_data);
+            $updated = wp_update_post($post_data);
+            if (is_wp_error($updated)) {
+                i8_action_log(sprintf('خطا در تغییر وضعیت پست %d به منتشر شده: %s', $post_id, $updated->get_error_message()));
+            } else {
+                i8_action_log(sprintf('پست با شناسه %d با موفقیت منتشر شد.', $post_id));
+            }
 
             // delete record where id=$id at $table_post_schedule
             $action_status = $wpdb->delete($table_post_schedule, array('id' => $id));
             if ($action_status) {
-                // //error_log('i8: deleted record with id=' . $id . 'from table ' . $table_post_schedule);
+                i8_action_log(sprintf('پست %d از جدول صف انتشار حذف شد.', $post_id));
             } else {
-                // //error_log('i8: failed to delete record with id=' . $id . 'from table ' . $table_post_schedule);
+                i8_action_log(sprintf('خطا در حذف پست %d از جدول صف انتشار.', $post_id));
             }
         } else {
-            // //error_log('not fund or not aa draft post and delete record');
+            i8_action_log(sprintf('پست با شناسه %d در وضعیت پیش‌نویس نبود (وضعیت فعلی: %s). حذف از صف.', $post_id, $post_status));
 
             i8_delete_item_at_scheulde_list($id, null);
             publish_post_at_scheduling_table();
@@ -233,57 +296,160 @@ add_action( 'i8_action_publish_post_at_scheduling_table', 'publish_post_at_sched
 function publish_post_at_scheduling_table()
 {
     try {
-        // date_default_timezone_set(timezoneId: 'Asia/Tehran');
-        error_log('i8_action_publish_post_at_scheduling_table RUNNING- ' . ' current time: ' . date('Y-m-d H:i:s') .' start_cron_time: ' . get_option('start_cron_time') . ' end_cron_time: ' . get_option('end_cron_time'));
+        i8_action_log('شروع فرآیند همگام‌سازی صف انتشار پست‌ها.');
 
-        // //error_log('publish_post_at_scheduling_table RUNNING');
-        date_default_timezone_set('Asia/Tehran');
-        $start_time_str = get_option('start_cron_time');
-        $end_time_str = get_option('end_cron_time');
-        $now = time();
-        $today = date('Y-m-d');
-        $start_time = strtotime($today . ' ' . $start_time_str);
-        $end_time_candidate = strtotime($today . ' ' . $end_time_str);
+        // همگام‌سازی و مهاجرت داده‌های جدول قدیمی به صف جدید اکشن اسکژولر
+        i8_migrate_old_queue_to_action_scheduler();
+    } catch (Exception $e) {
+        i8_action_log('خطا در اجرای فرآیند همگام‌سازی صف: ' . $e->getMessage());
+        error_log('i8: Error in publish_post_at_scheduling_table: ' . $e->getMessage());
+    }
+}
 
-        // Simple working hours check - no overnight logic
-        $end_time = $end_time_candidate;
+// Hook to handle individual post scheduling
+add_action('i8_action_publish_specific_post', 'i8_publish_specific_post_callback', 10, 1);
 
-        error_log('i8_action_publish_post_at_scheduling_table DEBUG - start_time: ' . date('Y-m-d H:i:s', $start_time) . ' end_time: ' . date('Y-m-d H:i:s', $end_time) . ' now: ' . date('Y-m-d H:i:s', $now));
+/**
+ * کالبک انتشار یک پست مشخص زمان‌بندی شده
+ */
+function i8_publish_specific_post_callback($post_id) {
+    i8_action_log(sprintf('شروع انتشار پست تکی با شناسه: %d', $post_id));
+    
+    $post_status = get_post_status($post_id);
+    if ($post_status === 'draft') {
+        global $wpdb;
+        $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
         
-        // بررسی اینکه آیا زمان فعلی در محدوده زمان کاری است
-        $in_work_time = ($now >= $start_time && $now <= $end_time);
-        error_log('i8_action_publish_post_at_scheduling_table DEBUG - in_work_time: ' . ($in_work_time ? 'true' : 'false'));
-        // تنظیم محدوده زمانی
-        if (!$in_work_time) {
-            error_log('i8_action_publish_post_at_scheduling_table - Not in work time, returning.');
-            return; // Stop execution if not in work time
+        date_default_timezone_set('Asia/Tehran');
+        $post_data = array(
+            'ID' => $post_id,
+            'post_status' => 'publish',
+            'post_date' => current_time('mysql'),
+            'post_date_gmt' => current_time('mysql', 1),
+        );
+        
+        $updated = wp_update_post($post_data);
+        if (is_wp_error($updated)) {
+            $err_msg = $updated->get_error_message();
+            i8_action_log(sprintf('خطا در انتشار پست %d: %s', $post_id, $err_msg));
+            if (function_exists('insert_rss_report')) {
+                insert_rss_report('انتشار پست زمان‌بندی شده', get_the_title($post_id), $post_id, '0', $err_msg);
+            }
+            throw new Exception($err_msg);
+        } else {
+            i8_action_log(sprintf('پست تکی %d با موفقیت منتشر شد.', $post_id));
+            if (function_exists('insert_rss_report')) {
+                insert_rss_report('انتشار پست زمان‌بندی شده', get_permalink($post_id), $post_id, '1', 'با موفقیت منتشر شد');
+            }
+            $wpdb->delete($table_post_schedule, array('post_id' => $post_id));
         }
+    } else {
+        $status_translations = array(
+            'publish' => 'منتشر شده',
+            'future' => 'زمان‌بندی شده',
+            'draft' => 'پیش‌نویس',
+            'pending' => 'در انتظار بررسی',
+            'private' => 'خصوصی',
+            'trash' => 'زباله‌دان',
+            'inherit' => 'ارث‌بری',
+        );
+        $translated_status = isset($status_translations[$post_status]) ? $status_translations[$post_status] : $post_status;
+        
+        i8_action_log(sprintf('پست %d در وضعیت پیش‌نویس نبود (وضعیت فعلی: %s). حذف از صف.', $post_id, $translated_status));
+        if (function_exists('insert_rss_report')) {
+            insert_rss_report('انتشار پست زمان‌بندی شده', get_the_title($post_id), $post_id, '0', 'پست پیش‌نویس نبود. وضعیت فعلی: ' . $translated_status);
+        }
+        global $wpdb;
+        $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
+        $wpdb->delete($table_post_schedule, array('post_id' => $post_id));
+    }
+}
 
-        if ($in_work_time) {
-            global $wpdb;
-            $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
-            if ($wpdb->get_var("SHOW TABLES LIKE '$table_post_schedule'") == $table_post_schedule) {
-                $high_priority_posts = $wpdb->get_results("SELECT * FROM $table_post_schedule WHERE publish_priority = 'high' ORDER BY id ASC LIMIT 1");
-                $medium_priority_posts = $wpdb->get_results("SELECT * FROM $table_post_schedule WHERE publish_priority = 'medium' ORDER BY id ASC LIMIT 1");
-                $low_priority_posts = $wpdb->get_results("SELECT * FROM $table_post_schedule WHERE publish_priority = 'low' ORDER BY id ASC LIMIT 1");
-                if ($high_priority_posts) {
-                    i8_change_post_status($high_priority_posts);
-                } elseif ($medium_priority_posts) {
-                    i8_change_post_status($medium_priority_posts);
-                } elseif ($low_priority_posts) {
-                    i8_change_post_status($low_priority_posts);
+/**
+ * محاسبه نوبت بعدی خالی برای انتشار پست به صورت کاملاً ایمن و بهینه
+ */
+function i8_get_next_available_publishing_slot() {
+    static $last_scheduled_timestamp = null;
+    $interval = calculate_post_publish_time();
+    
+    $base_time = time();
+    if ($last_scheduled_timestamp !== null) {
+        $base_time = $last_scheduled_timestamp;
+    } else {
+        if (function_exists('as_get_scheduled_actions')) {
+            $actions = as_get_scheduled_actions(array(
+                'hook' => 'i8_action_publish_specific_post',
+                'status' => ActionScheduler_Store::STATUS_PENDING,
+                'per_page' => 1,
+                'order' => 'DESC',
+            ));
+            
+            if (!empty($actions)) {
+                $last_action = array_shift($actions);
+                $last_schedule = $last_action->get_schedule()->get_date();
+                if ($last_schedule) {
+                    $base_time = $last_schedule->getTimestamp();
                 }
             }
         }
-        else {
-            error_log('i8 Out Of Work Time - NOT RUNNING: ' . ' current time: ' . date('Y-m-d H:i:s') .' start_cron_time: ' . get_option('start_cron_time') . ' end_cron_time: ' . get_option('end_cron_time'));
-        }
-    } catch (Exception $e) {
-        error_log('i8: Error in publish_post_at_scheduling_table: ' . $e->getMessage());
-        error_log('i8: Stack trace: ' . $e->getTraceAsString());
+    }
+    
+    $next_timestamp = max(time(), $base_time + $interval);
+    $last_scheduled_timestamp = $next_timestamp;
+    return $next_timestamp;
+}
+
+/**
+ * تنظیم زمان اجرای اکشن متناسب با ساعت کاری با امنیت منطقه زمانی
+ */
+function i8_adjust_timestamp_to_working_hours($timestamp) {
+    date_default_timezone_set('Asia/Tehran');
+    $start_time_str = get_option('start_cron_time', '08:00');
+    $end_time_str = get_option('end_cron_time', '22:00');
+    
+    $date_str = date('Y-m-d', $timestamp);
+    $start_time = strtotime($date_str . ' ' . $start_time_str);
+    $end_time = strtotime($date_str . ' ' . $end_time_str);
+    
+    if ($timestamp < $start_time) {
+        return $start_time;
+    } elseif ($timestamp > $end_time) {
+        $next_day_start = strtotime(date('Y-m-d', strtotime('+1 day', $timestamp)) . ' ' . $start_time_str);
+        return $next_day_start;
+    }
+    return $timestamp;
+}
+
+/**
+ * انتقال داده‌های موجود در جدول قدیمی به سیستم جدید اکشن اسکژولر
+ */
+function i8_migrate_old_queue_to_action_scheduler() {
+    global $wpdb;
+    $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
+    
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_post_schedule'") != $table_post_schedule) {
+        return;
+    }
+    
+    $posts = $wpdb->get_results("SELECT * FROM $table_post_schedule ORDER BY FIELD(publish_priority, 'high', 'medium', 'low'), id ASC LIMIT 20");
+    if (empty($posts)) {
+        return;
+    }
+    
+    i8_action_log(sprintf('یافتن %d پست در جدول قدیمی؛ در حال همگام‌سازی و برنامه‌ریزی در صف جدید...', count($posts)));
+    
+    foreach ($posts as $post) {
+        $post_id = intval($post->post_id);
         
-        // ثبت لاگ از خطا. بازیابی خودکار توسط تابع i8_ensure_scheduled_action_exists انجام خواهد شد.
-        error_log('i8: Automatic recovery will be handled by i8_ensure_scheduled_action_exists on next admin_init or fallback cron.');
+        if (function_exists('as_has_scheduled_action')) {
+            if (!as_has_scheduled_action('i8_action_publish_specific_post', array('post_id' => $post_id))) {
+                $slot = i8_get_next_available_publishing_slot();
+                $adjusted_slot = i8_adjust_timestamp_to_working_hours($slot);
+                
+                as_schedule_single_action($adjusted_slot, 'i8_action_publish_specific_post', array('post_id' => $post_id), 'i8_post_publisher');
+                i8_action_log(sprintf('پست %d با موفقیت به صف جدید منتقل و زمان‌بندی شد: %s', $post_id, date('Y-m-d H:i:s', $adjusted_slot)));
+            }
+        }
     }
 }
 
