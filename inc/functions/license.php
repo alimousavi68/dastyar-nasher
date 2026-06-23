@@ -2,47 +2,75 @@
 // Send request to server and get response
 function send_license_validation_request($secret_code)
 {
+    $debug_file = dirname(dirname(__DIR__)) . '/license_response_debug.json';
+
     $response = wp_remote_post(
         COP_REST_API_SERVER_URL,
         array(
             'body' => array(
                 'subscription_secret_code' => $secret_code,
                 'subscription_site_url' => home_url()
-            )
+            ),
+            'timeout'   => 20,
+            'sslverify' => false,
+            'user-agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         )
     );
 
     if (is_wp_error($response)) {
-        //error_log('Error: ' . print_r($response->get_error_message(), true));
+        $error_info = array(
+            'status' => 'WP_Error',
+            'error_message' => $response->get_error_message(),
+            'url' => COP_REST_API_SERVER_URL,
+            'secret_code' => $secret_code,
+            'site_url' => home_url()
+        );
+        @file_put_contents($debug_file, json_encode($error_info, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        error_log('i8 License Request Error: ' . $response->get_error_message());
         return 'Error in sending request';
     }
 
     $body = wp_remote_retrieve_body($response);
     $status = wp_remote_retrieve_response_code($response);
 
-    // error_log('i am client , secretcode: ' . $secret_code);
     error_log('i am client , request status: ' . $status);
-    // error_log(print_r($body, true));
 
     if ($status == 200) {
         $recived_data = json_decode($body, true);
 
+        $debug_info = array(
+            'status' => 'Success',
+            'http_code' => 200,
+            'received_data' => $recived_data,
+            'url' => COP_REST_API_SERVER_URL,
+            'secret_code' => $secret_code,
+            'site_url' => home_url()
+        );
+        @file_put_contents($debug_file, json_encode($debug_info, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
         $response_data = array(
-            'plan_name' => $recived_data['plan_name'],
-            'subscription_start_date' => $recived_data['subscription_start_date'],
-            'subscription_end_date' => $recived_data['subscription_end_date'],
-            'plan_duration' => $recived_data['plan_duration'],
-            'plan_cron_interval' => $recived_data['plan_cron_interval'],
-            'plan_max_post_fetch' => $recived_data['plan_max_post_fetch'],
-            'resources_data' => $recived_data['resources_data'],
+            'plan_name' => isset($recived_data['plan_name']) ? $recived_data['plan_name'] : '',
+            'subscription_start_date' => isset($recived_data['subscription_start_date']) ? $recived_data['subscription_start_date'] : '',
+            'subscription_end_date' => isset($recived_data['subscription_end_date']) ? $recived_data['subscription_end_date'] : '',
+            'plan_duration' => isset($recived_data['plan_duration']) ? $recived_data['plan_duration'] : '',
+            'plan_cron_interval' => isset($recived_data['plan_cron_interval']) ? $recived_data['plan_cron_interval'] : '',
+            'plan_max_post_fetch' => isset($recived_data['plan_max_post_fetch']) ? $recived_data['plan_max_post_fetch'] : '',
+            'resources_data' => isset($recived_data['resources_data']) ? $recived_data['resources_data'] : array(),
         );
         i8_save_response_license_data($response_data);
 
         return true;
     } else {
-        //error_log('error');
-        // FOR DOING : some doing work for notif to admin for expire lisence and disable plugin 
-        //error_log('i am client:' . 'License is not valid');
+        $error_info = array(
+            'status' => 'HTTP_Error',
+            'http_code' => $status,
+            'body' => $body,
+            'url' => COP_REST_API_SERVER_URL,
+            'secret_code' => $secret_code,
+            'site_url' => home_url()
+        );
+        @file_put_contents($debug_file, json_encode($error_info, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        
         cop_expired_subscription_actions();
         return false;
     }

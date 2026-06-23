@@ -466,9 +466,11 @@ function display_report_page()
                                 // قالب‌بندی نمایش تاریخ شمسی
                                 $date_display = $report['pub_date'];
                                 if (class_exists('i8_jDateTime')) {
-                                    $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
-                                    $timestamp = strtotime($report['pub_date']);
+                                    $tz = wp_timezone();
+                                    $tz_name = $tz ? $tz->getName() : 'Asia/Tehran';
+                                    $timestamp = strtotime($report['pub_date'] . ' UTC');
                                     if ($timestamp) {
+                                        $jdate = new i8_jDateTime(true, true, $tz_name);
                                         $date_display = $jdate->date('Y/m/d H:i:s', $timestamp);
                                     }
                                 }

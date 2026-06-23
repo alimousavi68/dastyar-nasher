@@ -68,14 +68,18 @@ function custom_rss_parser_run()
         foreach ($feeds_list as $feed):
             $feed_id = intval($feed->resource_id);
             if (function_exists('as_enqueue_async_action')) {
-                // ثبت وظیفه خزیدن به صورت غیرهمزمان و یکتا (Unique) برای جلوگیری از تداخل
+                // برای جلوگیری از ثبت تکراری یک منبع خاص، ابتدا چک می‌کنیم که آیا این شناسه فید در صف انتظار وجود دارد یا خیر
+                if (function_exists('as_has_scheduled_action') && as_has_scheduled_action('i8_action_crawl_feed', array('feed_id' => $feed_id), 'i8_scraper')) {
+                    error_log('i8: Feed ID ' . $feed_id . ' is already enqueued. Skipping.');
+                    continue;
+                }
                 as_enqueue_async_action(
                     'i8_action_crawl_feed', 
                     array('feed_id' => $feed_id), 
                     'i8_scraper', 
-                    true // یکتا بودن اکشن در صف انتظار
+                    false // مقدار را فالس می‌گذاریم تا همه فیدها ثبت شوند و مقایسه شناسه فید را خودمان در خط بالا انجام می‌دهیم
                 );
-                error_log('i8: Enqueued unique async crawl job for feed ID: ' . $feed_id);
+                error_log('i8: Enqueued async crawl job for feed ID: ' . $feed_id);
             } else {
                 // Fallback به روش همزمان در صورت غیرفعال بودن Action Scheduler
                 i8_crawl_single_feed($feed_id);
@@ -138,7 +142,7 @@ function i8_crawl_single_feed($feed_id) {
             
             // پیشگیری از خطای زمان‌های نامعتبر
             $raw_date = isset($item->pubDate) ? strtotime((string)$item->pubDate) : time();
-            $pub_date = date('Y-m-d H:i:s', $raw_date ? $raw_date : time());
+            $pub_date = gmdate('Y-m-d H:i:s', $raw_date ? $raw_date : time());
 
             if (isset($item->guid)) {
                 if ($need_to_merge_guid_link == 1) {
@@ -164,14 +168,16 @@ function i8_crawl_single_feed($feed_id) {
             insert_rss_report('اتمام خزیدن فید', $rss_feed_url, $resource_id, '1', sprintf('عملیات موفقیت‌آمیز بود. تعداد %d خبر جدید یافت شد.', $new_items_count));
         }
     } else {
-        error_log('i8: Failed to fetch feed for: ' . $resource_name . ' (or invalid XML structure)');
+        global $i8_last_feed_error;
+        $err_msg = isset($i8_last_feed_error) && !empty($i8_last_feed_error) ? $i8_last_feed_error : 'امکان واکشی یا اتصال به سرور فید وجود نداشت.';
+        error_log('i8: Failed to fetch feed for: ' . $resource_name . ' (' . $err_msg . ')');
         if (function_exists('insert_rss_report')) {
             insert_rss_report(
                 'خطا در خزیدن فید', 
                 $rss_feed_url, 
                 $resource_id, 
                 '0', 
-                $rss_feed ? 'فرمت ساختار فید نامعتبر است (آیتمی یافت نشد).' : 'امکان واکشی یا اتصال به سرور فید وجود نداشت.'
+                $rss_feed ? 'فرمت ساختار فید نامعتبر است (آیتمی یافت نشد).' : $err_msg
             );
         }
     }

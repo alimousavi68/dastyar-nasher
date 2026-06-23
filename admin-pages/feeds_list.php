@@ -213,8 +213,10 @@ function publisher_copoilot_callback()
                 <span> - </span>
                 <span class="text-secondary" style="font-size: 11px;"><?php
                 if ($i8_next_scrap_all_resource_feed_time = get_option('i8_next_scrap_all_resource_feed_time', '')) {
-                    date_default_timezone_set('Asia/Tehran');
-                    echo date('H:i', $i8_next_scrap_all_resource_feed_time);
+                    $tz = wp_timezone();
+                    $date_time = new DateTime('@' . $i8_next_scrap_all_resource_feed_time);
+                    $date_time->setTimezone($tz);
+                    echo $date_time->format('H:i');
                 }
                 ?> :واکشی بعدی </span>
             </div>
@@ -312,11 +314,13 @@ function custom_rss_parser_display_items()
                     $item_title = esc_html($item->title);
                     $resource_name = $item->resource_name ? $item->resource_name : '-';
 
-                    // fetch and set time zome feed_time and date
-                    $dateTime = new DateTime($item->pub_date, new DateTimeZone('GMT'));
-                    $dateTime->setTimezone(new DateTimeZone('Asia/Tehran'));
-                    $pub_date = \i8_jDateTime::convertFormatToFormat('d / m', 'm-d', $dateTime->format('m-d'));
-                    $pub_time = \i8_jDateTime::convertFormatToFormat('H:i', 'H:i', $dateTime->format('H:i'));
+                    // Parse pub_date as UTC, then convert to site timezone and format using i8_jDateTime
+                    $dateTime = new DateTime($item->pub_date, new DateTimeZone('UTC'));
+                    $tz = wp_timezone();
+                    $dateTime->setTimezone($tz);
+                    $timestamp = $dateTime->getTimestamp();
+                    $pub_date = \i8_jDateTime::date('d / m', $timestamp, true, true, $tz->getName());
+                    $pub_time = \i8_jDateTime::date('H:i', $timestamp, true, true, $tz->getName());
 
                     $resource_id = esc_attr($item->resource_id);
                     $admin_url = esc_url(get_admin_url() . 'images/wpspin_light-2x.gif');

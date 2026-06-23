@@ -168,12 +168,14 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
 
         //error_log('post_status here:' . $post_status);
 
-        date_default_timezone_set('Asia/Tehran');
-
         // Check if all required elements are found
         if ($title && $excerpt && $content && $thumbnail_url) {
             $random_interval = rand(300, 600);
             $publish_time = time() + $random_interval;
+            $tz = wp_timezone();
+            $date = new DateTime('@' . $publish_time);
+            $date->setTimezone($tz);
+            $post_date_str = $date->format('Y-m-d H:i:s');
 
             // Prepare data for creating a WordPress post
             $post_data = array(
@@ -181,7 +183,7 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
                 'post_content' => $content,
                 'post_excerpt' => $excerpt,
                 'post_status' => $post_status,
-                'post_date' => date('Y-m-d H:i:s', $publish_time) // زمان انتشار
+                'post_date' => $post_date_str // زمان انتشار
             );
 
             // درست کردن پست در وردپرس

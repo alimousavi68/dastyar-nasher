@@ -2,20 +2,51 @@
 // Function to fetch the RSS feed
 function fetch_rss_feed($url)
 {
-    $response = wp_remote_get($url);
+    // Make sure URL is properly encoded if it contains Persian or non-ASCII characters
+    $encoded_url = $url;
+    if (function_exists('encodeUrl')) {
+        $encoded_url = encodeUrl(trim($url));
+    } elseif (function_exists('encode_persian_chracter_allowed_url')) {
+        $encoded_url = encode_persian_chracter_allowed_url(trim($url));
+    } else {
+        $encoded_url = preg_replace_callback('/[^\x20-\x7f]/', function ($matches) {
+            return rawurlencode($matches[0]);
+        }, trim($url));
+    }
+
+    $args = array(
+        'timeout'     => 20,
+        'sslverify'   => false,
+        'user-agent'  => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'headers'     => array(
+            'Accept'          => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language' => 'fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7',
+        ),
+    );
+
+    $response = wp_remote_get($encoded_url, $args);
     
     if (is_wp_error($response)) {
-        // $report_id = insert_rss_report(
-        //     'درخواست واکشی فید های یک منبع',
-        //     $url,
-        //     123,
-        //     '0',
-        //     $response->get_error_message()
-        // );
+        error_log('i8 fetch_rss_feed error: ' . $response->get_error_message() . ' for URL: ' . $url);
+        global $i8_last_feed_error;
+        $i8_last_feed_error = $response->get_error_message();
+        return false;
+    }
+
+    $response_code = wp_remote_retrieve_response_code($response);
+    if ($response_code !== 200) {
+        error_log('i8 fetch_rss_feed HTTP error code: ' . $response_code . ' for URL: ' . $url);
+        global $i8_last_feed_error;
+        $i8_last_feed_error = 'کد وضعیت HTTP: ' . $response_code;
         return false;
     }
 
     $body = wp_remote_retrieve_body($response);
+    if (empty($body)) {
+        global $i8_last_feed_error;
+        $i8_last_feed_error = 'پاسخ دریافتی از سرور خالی بود.';
+        return false;
+    }
 
     // Suppress errors and capture them manually
     libxml_use_internal_errors(true);
@@ -23,20 +54,19 @@ function fetch_rss_feed($url)
 
     if ($rss_feed === false) {
         $errors = libxml_get_errors();
+        $xml_err_msgs = [];
         foreach ($errors as $error) {
-            // error_log('i8_feeds_error: XML Parsing Error: ' . $error->message . ' in ' . $error->file . ' on line ' . $error->line);
+            $xml_err_msgs[] = trim($error->message);
         }
-        // error_log('i8_feeds_error: Raw body content that caused error: ' . $body);
         libxml_clear_errors();
+        libxml_use_internal_errors(false);
+        
+        global $i8_last_feed_error;
+        $i8_last_feed_error = 'خطا در پارس XML فید: ' . implode(' | ', array_slice($xml_err_msgs, 0, 3));
+        error_log('i8 fetch_rss_feed XML error: ' . $i8_last_feed_error . ' for URL: ' . $url);
         return false;
     }
     libxml_use_internal_errors(false);
-    // $report_id = insert_rss_report(
-    //     'درخواست واکشی فید های یک منبع',
-    //     $url,
-    //     123,
-    //     'موفق',
-    // );
     return $rss_feed;
 }
 

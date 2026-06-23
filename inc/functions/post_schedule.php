@@ -216,8 +216,6 @@ function i8_change_post_status($priority_posts)
         $post_status = get_post_status($post_id);
 
         if ($post_status == 'draft') {
-            date_default_timezone_set('Asia/Tehran');
-
             // بجای قرار دادن در حالت future، مستقیما منتشر میکنیم تا جلوی انباشت و تاخیر گرفته شود
             $post_data = array(
                 'ID' => $post_id,
@@ -320,7 +318,6 @@ function i8_publish_specific_post_callback($post_id) {
         global $wpdb;
         $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
         
-        date_default_timezone_set('Asia/Tehran');
         $post_data = array(
             'ID' => $post_id,
             'post_status' => 'publish',
@@ -403,19 +400,27 @@ function i8_get_next_available_publishing_slot() {
  * تنظیم زمان اجرای اکشن متناسب با ساعت کاری با امنیت منطقه زمانی
  */
 function i8_adjust_timestamp_to_working_hours($timestamp) {
-    date_default_timezone_set('Asia/Tehran');
+    $tz = wp_timezone();
     $start_time_str = get_option('start_cron_time', '08:00');
     $end_time_str = get_option('end_cron_time', '22:00');
     
-    $date_str = date('Y-m-d', $timestamp);
-    $start_time = strtotime($date_str . ' ' . $start_time_str);
-    $end_time = strtotime($date_str . ' ' . $end_time_str);
+    $date = new DateTime('@' . $timestamp);
+    $date->setTimezone($tz);
+    $date_str = $date->format('Y-m-d');
+    
+    $start_dt = new DateTime($date_str . ' ' . $start_time_str, $tz);
+    $end_dt = new DateTime($date_str . ' ' . $end_time_str, $tz);
+    
+    $start_time = $start_dt->getTimestamp();
+    $end_time = $end_dt->getTimestamp();
     
     if ($timestamp < $start_time) {
         return $start_time;
     } elseif ($timestamp > $end_time) {
-        $next_day_start = strtotime(date('Y-m-d', strtotime('+1 day', $timestamp)) . ' ' . $start_time_str);
-        return $next_day_start;
+        $date->modify('+1 day');
+        $next_date_str = $date->format('Y-m-d');
+        $next_start_dt = new DateTime($next_date_str . ' ' . $start_time_str, $tz);
+        return $next_start_dt->getTimestamp();
     }
     return $timestamp;
 }

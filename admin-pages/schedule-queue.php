@@ -600,14 +600,20 @@ function pc_schedule_queue_page_callback()
                     <span class="i8-stat-value">
                         <?php
                         if ($timestamp) {
-                            $orig_tz = date_default_timezone_get();
-                            date_default_timezone_set('Asia/Tehran');
-                            if (class_exists('i8_jDateTime')) {
-                                $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
-                                $today_gregorian = date('Y-m-d');
-                                $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
-                                $scheduled_day_gregorian = date('Y-m-d', $timestamp);
+                            $tz = wp_timezone();
+                            $date_time = new DateTime('@' . $timestamp);
+                            $date_time->setTimezone($tz);
+                            $scheduled_day_gregorian = $date_time->format('Y-m-d');
 
+                            $today_dt = new DateTime('now', $tz);
+                            $today_gregorian = $today_dt->format('Y-m-d');
+
+                            $tomorrow_dt = clone $today_dt;
+                            $tomorrow_dt->modify('+1 day');
+                            $tomorrow_gregorian = $tomorrow_dt->format('Y-m-d');
+
+                            if (class_exists('i8_jDateTime')) {
+                                $jdate = new i8_jDateTime(true, true, $tz->getName());
                                 if ($scheduled_day_gregorian == $today_gregorian) {
                                     echo 'امروز ساعت ' . i8_to_persian_num($jdate->date('H:i', $timestamp));
                                 } elseif ($scheduled_day_gregorian == $tomorrow_gregorian) {
@@ -616,9 +622,8 @@ function pc_schedule_queue_page_callback()
                                     echo i8_to_persian_num($jdate->date('Y/m/d H:i', $timestamp));
                                 }
                             } else {
-                                echo i8_to_persian_num(date('Y-m-d H:i', $timestamp));
+                                echo i8_to_persian_num($date_time->format('Y-m-d H:i'));
                             }
-                            date_default_timezone_set($orig_tz);
                         } else {
                             echo 'غیرفعال';
                         }
@@ -699,14 +704,20 @@ function pc_schedule_queue_page_callback()
                                             $post_scheduled_timestamp = $timestamp + ($recurrence_seconds * $counter);
                                         }
                                         
-                                        $orig_tz = date_default_timezone_get();
-                                        date_default_timezone_set('Asia/Tehran');
-                                        if (class_exists('i8_jDateTime')) {
-                                            $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
-                                            $today_gregorian = date('Y-m-d');
-                                            $tomorrow_gregorian = date('Y-m-d', strtotime('+1 day'));
-                                            $scheduled_post_day_gregorian = date('Y-m-d', $post_scheduled_timestamp);
+                                        $tz = wp_timezone();
+                                        $date_time = new DateTime('@' . $post_scheduled_timestamp);
+                                        $date_time->setTimezone($tz);
+                                        $scheduled_post_day_gregorian = $date_time->format('Y-m-d');
 
+                                        $today_dt = new DateTime('now', $tz);
+                                        $today_gregorian = $today_dt->format('Y-m-d');
+
+                                        $tomorrow_dt = clone $today_dt;
+                                        $tomorrow_dt->modify('+1 day');
+                                        $tomorrow_gregorian = $tomorrow_dt->format('Y-m-d');
+
+                                        if (class_exists('i8_jDateTime')) {
+                                            $jdate = new i8_jDateTime(true, true, $tz->getName());
                                             if ($scheduled_post_day_gregorian == $today_gregorian) {
                                                 echo 'امروز ساعت ' . i8_to_persian_num($jdate->date('H:i', $post_scheduled_timestamp));
                                             } elseif ($scheduled_post_day_gregorian == $tomorrow_gregorian) {
@@ -715,9 +726,8 @@ function pc_schedule_queue_page_callback()
                                                 echo i8_to_persian_num($jdate->date('Y/m/d H:i', $post_scheduled_timestamp));
                                             }
                                         } else {
-                                            echo i8_to_persian_num(date('Y-m-d H:i', $post_scheduled_timestamp));
+                                            echo i8_to_persian_num($date_time->format('Y-m-d H:i'));
                                         }
-                                        date_default_timezone_set($orig_tz);
                                         $counter++;
                                     } else {
                                         echo '-';
@@ -775,7 +785,10 @@ function pc_schedule_queue_page_callback()
                         
                         $logs_slice = array_slice($publishing_logs, 0, 15);
                         foreach ($logs_slice as $log) {
-                            $time_display = date('H:i:s', strtotime($log['pub_date']));
+                            $tz = wp_timezone();
+                            $date_time = new DateTime($log['pub_date'], new DateTimeZone('UTC'));
+                            $date_time->setTimezone($tz);
+                            $time_display = $date_time->format('H:i:s');
                             $status_class = ($log['status'] == 0) ? 'i8-terminal-danger' : 'i8-terminal-success';
                             $status_badge = ($log['status'] == 0) ? '[ERROR]' : '[SUCCESS]';
                             

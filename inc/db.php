@@ -102,9 +102,8 @@ add_action('admin_init', 'create_rss_reports_table');
 function insert_rss_report($action_title, $resource_name, $resource_id, $status, $error_msg = '') {
     global $wpdb;
     $table_name = $wpdb->prefix . 'pc_reports';
-    // set tehran timezone and fetch current time 
-    date_default_timezone_set('Asia/Tehran');
-    $now = date('Y-m-d H:i:s');
+    // Store in UTC (GMT) to avoid global timezone mutation and keep logs timezone-independent
+    $now = current_time('mysql', 1);
 
     $data = array(
         'action_title' => $action_title,

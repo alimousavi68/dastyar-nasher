@@ -92,7 +92,6 @@ function i8_get_dashboard_stats() {
                     $next_post_title = get_the_title($post_id);
                     $schedule_date = $next_action->get_schedule()->get_date();
                     if ($schedule_date) {
-                        date_default_timezone_set('Asia/Tehran');
                         $next_post_time = $schedule_date->getTimestamp();
                     }
                 }
@@ -314,10 +313,14 @@ function i8_dashboard_publishing_widget_render() {
     $next_run_display = 'بدون برنامه';
     if (!empty($stats['next_post_time'])) {
         if (class_exists('i8_jDateTime')) {
-            $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
+            $tz = wp_timezone();
+            $jdate = new i8_jDateTime(true, true, $tz->getName());
             $next_run_display = $jdate->date('H:i:s', $stats['next_post_time']);
         } else {
-            $next_run_display = date('H:i:s', $stats['next_post_time']);
+            $tz = wp_timezone();
+            $date_time = new DateTime('@' . $stats['next_post_time']);
+            $date_time->setTimezone($tz);
+            $next_run_display = $date_time->format('H:i:s');
         }
         $next_run_display = i8_dash_to_persian_num($next_run_display);
     }
@@ -384,10 +387,14 @@ function i8_dashboard_monitoring_widget_render() {
     $next_crawl_display = 'در صف انتظار';
     if ($next_crawl_time) {
         if (class_exists('i8_jDateTime')) {
-            $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
+            $tz = wp_timezone();
+            $jdate = new i8_jDateTime(true, true, $tz->getName());
             $next_crawl_display = $jdate->date('H:i:s', $next_crawl_time);
         } else {
-            $next_crawl_display = date('H:i:s', $next_crawl_time);
+            $tz = wp_timezone();
+            $date_time = new DateTime('@' . $next_crawl_time);
+            $date_time->setTimezone($tz);
+            $next_crawl_display = $date_time->format('H:i:s');
         }
         $next_crawl_display = i8_dash_to_persian_num($next_crawl_display);
     }
