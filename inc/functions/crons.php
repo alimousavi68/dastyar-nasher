@@ -15,8 +15,8 @@ function i8_ensure_scheduled_action_exists() {
         i8_migrate_old_queue_to_action_scheduler();
     }
     
-    // بررسی وجود scheduled action قدیمی
-    $next_scheduled = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table');
+    // بررسی وجود scheduled action قدیمی با تعیین گروه i8_cronjobs
+    $next_scheduled = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table', array(), 'i8_cronjobs');
     
     if (!$next_scheduled) {
         error_log('i8: Scheduled action not found, recreating automatically...');
@@ -39,7 +39,7 @@ function i8_setup_fallback_cron() {
 
 function i8_fallback_check_scheduled_action() {
     if (function_exists('as_next_scheduled_action')) {
-        $next_scheduled = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table');
+        $next_scheduled = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table', array(), 'i8_cronjobs');
         if (!$next_scheduled) {
             error_log('i8: Fallback cron detected missing scheduled action, recreating...');
             do_action('i8_action_set_cron_job_publishe_posts');
@@ -69,9 +69,9 @@ function i8_ajax_recreate_scheduled_action() {
         // اجرای action برای بازیابی scheduled action
         do_action('i8_action_set_cron_job_publishe_posts');
         
-        // بررسی موفقیت
+        // بررسی موفقیت با تعیین گروه i8_cronjobs
         if (function_exists('as_next_scheduled_action')) {
-            $next_scheduled = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table');
+            $next_scheduled = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table', array(), 'i8_cronjobs');
             if ($next_scheduled) {
                 wp_die(json_encode(array('success' => true, 'message' => 'scheduled action با موفقیت بازیابی شد')));
             } else {

@@ -73,8 +73,8 @@ function i8_check_and_recover_scheduled_action() {
         return false;
     }
     
-    // بررسی وجود scheduled action
-    $next_scheduled = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table');
+    // بررسی وجود scheduled action با تعیین گروه i8_cronjobs
+    $next_scheduled = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table', array(), 'i8_cronjobs');
     
     if (!$next_scheduled) {
         // اگر scheduled action وجود ندارد، آن را بازیابی کن
@@ -86,7 +86,7 @@ function i8_check_and_recover_scheduled_action() {
         }
         
         // بررسی مجدد
-        $recovered = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table');
+        $recovered = as_next_scheduled_action('i8_action_publish_post_at_scheduling_table', array(), 'i8_cronjobs');
         
         if ($recovered) {
             error_log('i8: scheduled action با موفقیت بازیابی شد');
@@ -251,14 +251,20 @@ function i8_change_post_status($priority_posts)
 // Calculte post published time interval base on user settings
 function calculate_post_publish_time()
 {
-    $post_publisher_start_time = get_option('start_cron_time') ? get_option('start_cron_time') : '';
-    $post_publisher_end_time = get_option('end_cron_time') ? get_option('end_cron_time') : '';
+    $post_publisher_start_time = get_option('start_cron_time') ? get_option('start_cron_time') : '08:00';
+    $post_publisher_end_time = get_option('end_cron_time') ? get_option('end_cron_time') : '22:00';
 
-    $news_interval_start = get_option('news_interval_start') ? get_option('news_interval_start') : '30';
-    $news_interval_end =   get_option('news_interval_end') ? get_option('news_interval_end') : '40';
-    $post_publisher_daily_post_count = rand($news_interval_start,$news_interval_end);
+    $news_interval_start = get_option('news_interval_start') ? intval(get_option('news_interval_start')) : 30;
+    $news_interval_end =   get_option('news_interval_end') ? intval(get_option('news_interval_end')) : 40;
 
-    $post_publishe_count = get_option('daily_post_count_for_schedule') ? get_option('daily_post_count_for_schedule') : '60';
+    // استفاده از آپشن هدف روزانه (که روزی یکبار تصادفی‌سازی می‌شود) به جای تابع rand() در هر کلیک
+    $post_publishe_count = get_option('daily_post_count_for_schedule');
+    if (!$post_publishe_count) {
+        $post_publishe_count = rand($news_interval_start, $news_interval_end);
+        update_option('daily_post_count_for_schedule', $post_publishe_count);
+    } else {
+        $post_publishe_count = intval($post_publishe_count);
+    }
 
     // تبدیل ساعت شروع و پایان به ثانیه از ابتدای روز
     $start_parts = explode(':', $post_publisher_start_time);
@@ -266,13 +272,13 @@ function calculate_post_publish_time()
     $start_seconds = isset($start_parts[0], $start_parts[1]) ? ($start_parts[0] * 3600 + $start_parts[1] * 60) : 0;
     $end_seconds = isset($end_parts[0], $end_parts[1]) ? ($end_parts[0] * 3600 + $end_parts[1] * 60) : 0;
 
-    // محاسبه ساده فواصل زمانی بدون خطر تقسیم بر صفر
-    $interval = $end_seconds - $start_seconds;
+    // محاسبه ساده فواصل زمانی با پشتیبانی از ساعات کاری شبانه (Overnight Working Hours)
+    $interval = ($end_seconds <= $start_seconds) ? (24 * 3600 - $start_seconds + $end_seconds) : ($end_seconds - $start_seconds);
     if ($interval <= 0) {
         $interval = 1; // جلوگیری از مقدار صفر
     }
     
-    $post_count = max(1, $post_publisher_daily_post_count);
+    $post_count = max(1, $post_publishe_count);
     $post_publishe_interval_time = round($interval / $post_count);
     
     // اگر فاصله زمانی کمتر از ۱ دقیقه شد، حداقل ۶۰ ثانیه در نظر می‌گیریم
@@ -282,7 +288,6 @@ function calculate_post_publish_time()
     error_log('i8_calculate_post_publish_time DEBUG - start_seconds: ' . $start_seconds . ' end_seconds: ' . $end_seconds);
     error_log('i8_calculate_post_publish_time DEBUG - calculated interval (seconds): ' . $interval);
     error_log('i8_calculate_post_publish_time DEBUG - post_publishe_count: ' . $post_publishe_count);
-    error_log('i8_calculate_post_publish_time DEBUG - post_per_hours: ' . $post_per_hours);
     error_log('i8_calculate_post_publish_time DEBUG - post_publishe_interval_time (seconds): ' . $post_publishe_interval_time);
 
     return $post_publishe_interval_time;
@@ -392,8 +397,10 @@ function i8_get_next_available_publishing_slot() {
     }
     
     $next_timestamp = max(time(), $base_time + $interval);
-    $last_scheduled_timestamp = $next_timestamp;
-    return $next_timestamp;
+    // اصلاح باگ انباشتگی پست‌ها: تعدیل زمان بر اساس ساعات کاری و ذخیره آن در متغیر استاتیک جهت حفظ ترتیب در حلقه‌ها
+    $adjusted_timestamp = i8_adjust_timestamp_to_working_hours($next_timestamp);
+    $last_scheduled_timestamp = $adjusted_timestamp;
+    return $adjusted_timestamp;
 }
 
 /**

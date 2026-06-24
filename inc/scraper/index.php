@@ -256,11 +256,8 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
                 //error_log('my post prority: ' . $publish_priority);
 
                 if ($publish_priority != 'now' and $publish_priority != 'pending') {
-                    //error_log('im here . in to if : ' . $publish_priority);
-
-                    global $wpdb;
-                    $table_name = $wpdb->prefix . 'pc_post_schedule';
-                    $wpdb->insert($table_name, array('post_id' => $post_id, 'publish_priority' => $publish_priority));
+                    // استفاده از تابع زمان‌بندی بومی افزونه به جای درج مستقیم جهت ثبت در صف مدرن Action Scheduler
+                    add_post_to_post_schedule_table($post_id, $publish_priority);
                 }
 
                 return (array('status' => true, 'message' => 'پست منتشر شد'));

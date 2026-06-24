@@ -42,8 +42,8 @@ add_action('set_daily_post_count_for_schedule_task', 'set_daily_post_count_for_s
 function set_daily_post_count_for_schedule_task()
 {
     //error_log('im here: set_daily_post_count_for_schedule_task');
-    $news_interval_start = get_option('news_interval_start') ? get_option('news_interval_start') : '20';
-    $news_interval_end = get_option('news_interval_end') ? get_option('news_interval_end') : '30';
+    $news_interval_start = get_option('news_interval_start') ? intval(get_option('news_interval_start')) : 30;
+    $news_interval_end = get_option('news_interval_end') ? intval(get_option('news_interval_end')) : 40;
 
     update_option('daily_post_count_for_schedule', rand($news_interval_start, $news_interval_end));
 }
