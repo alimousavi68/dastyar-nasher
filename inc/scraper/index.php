@@ -6,11 +6,16 @@ require_once(__DIR__ . '/scraper_functions.php');
 add_action('wp_ajax_publish_scraper', 'dastyar_publish_scraper_ajax_handler');
 
 function dastyar_publish_scraper_ajax_handler() {
+    ob_start(); // Start output buffering to capture any accidental warnings/notices
+
     // Validate security nonce
     check_ajax_referer('dastyar_publish_scraper_nonce', 'security');
 
     // Check capability
     if (!current_user_can('edit_posts')) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         echo json_encode(array('status' => false, 'message' => 'شما دسترسی کافی ندارید.'));
         wp_die();
     }
@@ -21,6 +26,9 @@ function dastyar_publish_scraper_ajax_handler() {
     $publish_priority = isset($_POST['publish_priority']) ? sanitize_text_field($_POST['publish_priority']) : 'now';
 
     if (empty($guid) || empty($resource_id) || empty($item_id)) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         echo json_encode(array('status' => false, 'message' => 'پارامترهای ارسالی نامعتبر هستند.'));
         wp_die();
     }
@@ -33,12 +41,11 @@ function dastyar_publish_scraper_ajax_handler() {
     $response = scrape_and_publish_post($guid, $resource_id, $publish_priority);
 
     // پاک‌سازی کامل بافر خروجی برای جلوگیری از ارسال هشدارها/پیام‌های متفرقه سایر افزونه‌ها به همراه جی‌سان
-    if (ob_get_length()) {
-        ob_clean();
+    while (ob_get_level() > 0) {
+        ob_end_clean();
     }
     
-    echo json_encode($response);
-    wp_die();
+    wp_send_json($response);
 }
 
 // اکشن AJAX برای حذف تمام فیدها
@@ -285,8 +292,23 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
             try {
                 ob_start(); // اطمینان از اینکه بافر خروجی شروع شده است
                 $post_id = wp_insert_post($post_data);
-                ob_flush(); // تخلیه خروجی (اگر نیاز به تخلیه باشد)
+                ob_end_clean(); // تمیز کردن و بستن بافر بدون خروجی به کاربر
+
+                if (is_wp_error($post_id)) {
+                    $error_msg = $post_id->get_error_message();
+                    $report_id = insert_rss_report(
+                        'درخواست واکشی یک پست',
+                        $encoded_url,
+                        123,
+                        '0',
+                        'خطایی در حین ایجاد پست پیش آمده است: ' . $error_msg
+                    );
+                    return array('status' => false, 'message' => 'خطایی در حین ایجاد پست پیش آمده است: ' . $error_msg);
+                }
             } catch (Exception $e) {
+                if (ob_get_level() > 0) {
+                    ob_end_clean();
+                }
                 // insert rss report error for this section
                 $report_id = insert_rss_report(
                     'درخواست واکشی یک پست',
@@ -302,8 +324,9 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
             if ($post_id && function_exists('media_sideload_image')) {
                 $thumbnail_url = complete_url($thumbnail_url, $source_root_link);
 
-
+                ob_start();
                 $attachment_id = media_sideload_image($thumbnail_url, $post_id, 'thumbnail', 'id');
+                ob_end_clean();
 
                 if (!is_wp_error($attachment_id)) {
                     set_post_thumbnail($post_id, $attachment_id);
