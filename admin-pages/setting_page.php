@@ -1,13 +1,6 @@
 <?php
 
-require_once ABSPATH . 'wp-admin/includes/file.php';
-$wp_load_path = get_home_path() . 'wp-load.php';
-
-if (file_exists($wp_load_path)) {
-    require_once($wp_load_path);
-} else {
-    exit;
-}
+defined('ABSPATH') || exit;
 
 // ایجاد صفحه تنظیمات
 function publisher_copoilot_setting_page_callback() {
