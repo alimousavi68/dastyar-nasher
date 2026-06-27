@@ -637,7 +637,7 @@ a { text-decoration: none !important; }
 }
 
 .table-item.loading-state .row-loading-overlay {
-    display: none !important;
+    display: flex !important;
 }
 
 .premium-spinner {
