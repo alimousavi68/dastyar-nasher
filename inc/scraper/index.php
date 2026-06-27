@@ -31,6 +31,12 @@ function dastyar_publish_scraper_ajax_handler() {
     require_once(ABSPATH . 'wp-admin/includes/file.php');
 
     $response = scrape_and_publish_post($guid, $resource_id, $publish_priority);
+
+    // پاک‌سازی کامل بافر خروجی برای جلوگیری از ارسال هشدارها/پیام‌های متفرقه سایر افزونه‌ها به همراه جی‌سان
+    if (ob_get_length()) {
+        ob_clean();
+    }
+    
     echo json_encode($response);
     wp_die();
 }
