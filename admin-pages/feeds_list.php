@@ -735,7 +735,7 @@ function custom_rss_parser_display_items()
                                 },
                                 success: function (response) {
                                     try {
-                                        var res = JSON.parse(response);
+                                        var res = typeof response === 'object' ? response : JSON.parse(response);
                                         if (res.status === true) {
                                             showCustomToast(res.message, 'success', postTitle);
                                             if (rowEl) {

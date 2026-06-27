@@ -13,11 +13,8 @@ function dastyar_publish_scraper_ajax_handler() {
 
     // Check capability
     if (!current_user_can('edit_posts')) {
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        echo json_encode(array('status' => false, 'message' => 'شما دسترسی کافی ندارید.'));
-        wp_die();
+        ob_end_clean(); // فقط بافر خودمان را پاک می‌کنیم
+        wp_send_json(array('status' => false, 'message' => 'شما دسترسی کافی ندارید.'));
     }
 
     $item_id = isset($_POST['item_id']) ? intval($_POST['item_id']) : 0;
@@ -26,11 +23,8 @@ function dastyar_publish_scraper_ajax_handler() {
     $publish_priority = isset($_POST['publish_priority']) ? sanitize_text_field($_POST['publish_priority']) : 'now';
 
     if (empty($guid) || empty($resource_id) || empty($item_id)) {
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        echo json_encode(array('status' => false, 'message' => 'پارامترهای ارسالی نامعتبر هستند.'));
-        wp_die();
+        ob_end_clean(); // فقط بافر خودمان را پاک می‌کنیم
+        wp_send_json(array('status' => false, 'message' => 'پارامترهای ارسالی نامعتبر هستند.'));
     }
 
     // لود پیش‌نیازهای مدیا به صورت مستقیم
@@ -40,13 +34,14 @@ function dastyar_publish_scraper_ajax_handler() {
 
     $response = scrape_and_publish_post($guid, $resource_id, $publish_priority);
 
-    // پاک‌سازی کامل بافر خروجی برای جلوگیری از ارسال هشدارها/پیام‌های متفرقه سایر افزونه‌ها به همراه جی‌سان
-    while (ob_get_level() > 0) {
+    // فقط بافری که خودمان باز کردیم را می‌بندیم - while(ob_get_level>0) اشتباه است و بافرهای هسته وردپرس را هم از بین می‌برد
+    if (ob_get_level() > 0) {
         ob_end_clean();
     }
-    
+
     wp_send_json($response);
 }
+
 
 // اکشن AJAX برای حذف تمام فیدها
 add_action('wp_ajax_dastyar_delete_all_feeds', 'dastyar_delete_all_feeds_ajax_handler');
@@ -136,7 +131,7 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
 
     if ($result['code'] == 301 || $result['code'] == 302 || $result['code'] == '301-like' || $result['code'] == '301-in-html') {
         insert_rss_report('درخواست واکشی یک پست', $encoded_url, 123, '0', 'خطای ریدایرکت ۳۰۱ صادر شد');
-        $encoded_url = $status_code['new_location'];
+        $encoded_url = $result['new_location'];
 
         $html_content = fetch_html_with_curl($encoded_url);
         if ($html_content == '') {
@@ -147,7 +142,7 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
 
         // return array('code' => '301', 'new_location' => $headers['Location']);
     } else if ($result['code'] != '200') {
-        insert_rss_report('درخواست واکشی یک پست', $encoded_url, 123, '0', ' خطایی با این کد صادر شده: ' . $status_code['code']);
+        insert_rss_report('درخواست واکشی یک پست', $encoded_url, 123, '0', ' خطایی با این کد صادر شده: ' . $result['code']);
     } else {
         $html_content = fetch_html_with_curl($url);
         if ($html_content == '') {

@@ -213,8 +213,8 @@ function fetch_html_with_curl($url)
     curl_setopt($ch, CURLOPT_HTTPHEADER, $selectedHeaders);           // ارسال هدرهای انتخاب شده
     curl_setopt($ch, CURLOPT_COOKIEJAR, 'cookie.txt');                // ذخیره کوکی‌ها
     curl_setopt($ch, CURLOPT_COOKIEFILE, 'cookie.txt');               // استفاده از کوکی‌ها
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);                          // محدودیت زمانی
-    curl_setopt($ch, CURLOPT_HEADER, true);                         // دریافت هدرهای پاسخ همراه با بدنه
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);                          // محدودیت زمانی - افزایش برای سایت‌های کند
+    curl_setopt($ch, CURLOPT_HEADER, true);                         // دریافت هدرها همراه با بدنه (جداسازی بعداً)
     curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);    // استفاده از HTTP/1.1
     curl_setopt($ch, CURLOPT_ENCODING, "");                         // اجازه به cURL برای مدیریت فشرده‌سازی
 
@@ -223,12 +223,20 @@ function fetch_html_with_curl($url)
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
     // اجرای درخواست
-    $response = curl_exec($ch);
+    $raw_response = curl_exec($ch);
+    $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
 
     // بستن ارتباط cURL
     curl_close($ch);
 
-    return $response;
+    if ($raw_response === false) {
+        return '';
+    }
+
+    // جداسازی body از headers - مشکل اصلی: CURLOPT_HEADER=true باعث می‌شد headers با body مخلوط شوند
+    $body = substr($raw_response, $header_size);
+
+    return $body;
 }
 
 
