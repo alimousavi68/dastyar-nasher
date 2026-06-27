@@ -249,9 +249,7 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
 
 
         $post_status = 'draft';
-        if ($publish_priority == 'now') {
-            $post_status = 'publish';
-        } elseif ($publish_priority == 'pending') {
+        if ($publish_priority == 'pending') {
             $post_status = 'pending';
         }
 
@@ -367,7 +365,40 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
 
                 //error_log('my post prority: ' . $publish_priority);
 
-                if ($publish_priority != 'now' and $publish_priority != 'pending') {
+                if ($publish_priority == 'now') {
+                    // انتشار غیرهمزمان در پس‌زمینه برای جلوگیری از خطای Timeout/Invalid Response در AJAX
+                    global $wpdb;
+                    $table = $wpdb->prefix . 'pc_post_schedule';
+                    $publish_time = time() + 3;
+                    
+                    if (function_exists('as_schedule_single_action')) {
+                        $action_id = as_schedule_single_action($publish_time, 'i8_action_publish_specific_post', array('post_id' => $post_id), 'i8_post_publisher');
+                        
+                        $max_order = $wpdb->get_var("SELECT MAX(sort_order) FROM $table WHERE status IN ('queued', 'scheduled')");
+                        $new_order = intval($max_order) + 1;
+                        
+                        $wpdb->insert(
+                            $table,
+                            array(
+                                'post_id' => $post_id,
+                                'publish_priority' => 'high',
+                                'status' => 'scheduled',
+                                'sort_order' => $new_order,
+                                'scheduled_for' => gmdate('Y-m-d H:i:s', $publish_time),
+                                'as_action_id' => $action_id,
+                                'created_at' => current_time('mysql')
+                            )
+                        );
+                    } else {
+                        // fallback
+                        wp_update_post(array(
+                            'ID' => $post_id,
+                            'post_status' => 'publish',
+                            'post_date' => current_time('mysql'),
+                            'post_date_gmt' => current_time('mysql', 1)
+                        ));
+                    }
+                } elseif ($publish_priority != 'pending') {
                     // استفاده از تابع زمان‌بندی بومی افزونه به جای درج مستقیم جهت ثبت در صف مدرن Action Scheduler
                     add_post_to_post_schedule_table($post_id, $publish_priority);
                 }
