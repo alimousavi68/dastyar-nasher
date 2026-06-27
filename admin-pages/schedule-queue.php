@@ -76,22 +76,14 @@ function pc_schedule_queue_page_callback() {
         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count
     FROM $table");
     
-    // Count all published WP posts today
-    $args = array(
-        'post_type' => 'post',
-        'post_status' => 'publish',
-        'date_query' => array(
-            array(
-                'year'  => date('Y', current_time('timestamp')),
-                'month' => date('m', current_time('timestamp')),
-                'day'   => date('d', current_time('timestamp')),
-            ),
-        ),
-        'fields' => 'ids',
-        'no_found_rows' => false
-    );
-    $query = new WP_Query($args);
-    $published_today = $query->found_posts;
+    // کوئری بهینه و مستقیم جهت شمارش پست‌های منتشر شده امروز بدون سرریز لود WP_Query
+    $today_start = date('Y-m-d 00:00:00', current_time('timestamp'));
+    $today_end = date('Y-m-d 23:59:59', current_time('timestamp'));
+    $published_today = $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(ID) FROM {$wpdb->posts} WHERE post_type = 'post' AND post_status = 'publish' AND post_date >= %s AND post_date <= %s",
+        $today_start,
+        $today_end
+    ));
     // Check if Action Scheduler is active
     $as_active = function_exists('as_schedule_single_action');
 ?>
