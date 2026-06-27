@@ -1,5 +1,8 @@
 <?php
 
+// Hook the recurring action to process the queue as a fallback mechanism
+add_action('i8_action_publish_post_at_scheduling_table', 'i8_process_queue');
+
 // add action for active plugin and update option
 add_action('i8_action_set_cron_job_publishe_posts', 'i8_set_cron_job_publishe_posts');
 

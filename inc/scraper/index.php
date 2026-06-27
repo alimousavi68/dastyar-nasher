@@ -1,30 +1,105 @@
 <?php
+defined('ABSPATH') || exit;
 
-require_once(__DIR__ . '/../../../../../wp-load.php');
-require_once(__DIR__ . '/../../../../../wp-admin/includes/media.php');
-require_once(__DIR__ . '/../../../../../wp-admin/includes/image.php');
-require_once(__DIR__ . '/../../../../../wp-admin/includes/file.php');
 require_once(__DIR__ . '/scraper_functions.php');
 
+add_action('wp_ajax_publish_scraper', 'dastyar_publish_scraper_ajax_handler');
 
-// Check if the request is an Ajax request
-if (isset($_POST['action']) && !empty($_POST['action'])) {
-    if ($_POST['action'] == 'publish_scraper') {
-        $guid = $_POST['post_Guid'];
-        $resource_id = $_POST['resource_id'];
-        $publish_priority = isset($_POST['publish_priority']) ? $_POST['publish_priority'] : 'now';
+function dastyar_publish_scraper_ajax_handler() {
+    // Validate security nonce
+    check_ajax_referer('dastyar_publish_scraper_nonce', 'security');
 
-        $response = scrape_and_publish_post($guid, $resource_id, $publish_priority);
-        echo json_encode($response);
+    // Check capability
+    if (!current_user_can('edit_posts')) {
+        echo json_encode(array('status' => false, 'message' => 'شما دسترسی کافی ندارید.'));
+        wp_die();
+    }
+
+    $item_id = isset($_POST['item_id']) ? intval($_POST['item_id']) : 0;
+    $guid = isset($_POST['post_Guid']) ? esc_url_raw($_POST['post_Guid']) : '';
+    $resource_id = isset($_POST['resource_id']) ? intval($_POST['resource_id']) : 0;
+    $publish_priority = isset($_POST['publish_priority']) ? sanitize_text_field($_POST['publish_priority']) : 'now';
+
+    if (empty($guid) || empty($resource_id) || empty($item_id)) {
+        echo json_encode(array('status' => false, 'message' => 'پارامترهای ارسالی نامعتبر هستند.'));
+        wp_die();
+    }
+
+    // لود پیش‌نیازهای مدیا به صورت مستقیم
+    require_once(ABSPATH . 'wp-admin/includes/media.php');
+    require_once(ABSPATH . 'wp-admin/includes/image.php');
+    require_once(ABSPATH . 'wp-admin/includes/file.php');
+
+    $response = scrape_and_publish_post($guid, $resource_id, $publish_priority);
+    echo json_encode($response);
+    wp_die();
+}
+
+// اکشن AJAX برای حذف تمام فیدها
+add_action('wp_ajax_dastyar_delete_all_feeds', 'dastyar_delete_all_feeds_ajax_handler');
+function dastyar_delete_all_feeds_ajax_handler() {
+    check_ajax_referer('cop_delete_all_nonce', 'security');
+
+    if (!current_user_can('edit_posts')) {
+        wp_send_json_error('شما دسترسی کافی ندارید.');
+    }
+
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'custom_rss_items';
+    $result = $wpdb->query("DELETE FROM $table_name");
+
+    if ($result !== false) {
+        wp_send_json_success(array('message' => 'تمامی فیدها با موفقیت حذف شدند.'));
+    } else {
+        wp_send_json_error('خطا در حذف فیدها از دیتابیس.');
     }
 }
-add_action('admin_post_scrape_and_publish_post', 'scrape_and_publish_post');
+
+// اکشن AJAX برای به‌روزرسانی تمام فیدها به صورت مستقیم و همزمان (جهت ثبات بالا و رفع قفل شدن صف)
+add_action('wp_ajax_dastyar_update_all_feeds', 'dastyar_update_all_feeds_ajax_handler');
+function dastyar_update_all_feeds_ajax_handler() {
+    check_ajax_referer('cop_update_feeds_nonce', 'security');
+
+    if (!current_user_can('edit_posts')) {
+        wp_send_json_error('شما دسترسی کافی ندارید.');
+    }
+
+    try {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'custom_resource_details';
+        $resources = $wpdb->get_results("SELECT resource_id FROM $table_name");
+
+        if (file_exists(dirname(__DIR__) . '/crons/crons.php')) {
+            require_once(dirname(__DIR__) . '/crons/crons.php');
+        }
+
+        $total_new_items = 0;
+        if ($resources) {
+            foreach ($resources as $resource) {
+                $feed_id = intval($resource->resource_id);
+                $new_items = i8_crawl_single_feed($feed_id);
+                $total_new_items += intval($new_items);
+            }
+        }
+
+        wp_send_json_success(array(
+            'message' => 'به‌روزرسانی با موفقیت به صورت مستقیم انجام شد.',
+            'new_items_count' => $total_new_items
+        ));
+    } catch (Throwable $e) {
+        wp_send_json_error('خطای سیستم: ' . $e->getMessage());
+    }
+}
+
+
 
 
 // Function to scrape data from a given URL and create a new WordPress post
 function scrape_and_publish_post($guid, $resource_id, $publish_priority)
 {
-    // دریافت مقادیر از فرم
+    $html = null;
+    try {
+        // دریافت مقادیر از فرم
     $title_selector = get_resource_data($resource_id, 'title_selector');
     $img_selector = get_resource_data($resource_id, 'img_selector');
     $lead_selector = get_resource_data($resource_id, 'lead_selector');
@@ -144,8 +219,9 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
             );
         }
 
-        if ($thumbnail_url = $html->find($img_selector, 0)->src != null) {
-            $thumbnail_url = $html->find($img_selector, 0)->src;
+        $img_element = $html->find($img_selector, 0);
+        if ($img_element && $img_element->src != null) {
+            $thumbnail_url = $img_element->src;
         } else {
             $thumbnail_url = '';
             // insert rss report error for this section
@@ -170,8 +246,12 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
 
         // Check if all required elements are found
         if ($title && $excerpt && $content && $thumbnail_url) {
-            $random_interval = rand(300, 600);
-            $publish_time = time() + $random_interval;
+            if ($publish_priority == 'now') {
+                $publish_time = time();
+            } else {
+                $random_interval = rand(300, 600);
+                $publish_time = time() + $random_interval;
+            }
             $tz = wp_timezone();
             $date = new DateTime('@' . $publish_time);
             $date->setTimezone($tz);
@@ -247,6 +327,9 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
 
             // Output success or failure message
             if ($post_id) {
+                // ذخیره کردن لینک اصلی فید برای رهگیری وضعیت
+                update_post_meta($post_id, '_dastyar_feed_guid', $guid);
+
                 // echo '<script>window.open("' . admin_url('post.php?action=edit&post=' . $post_id) . '", "_blank", "noopener,noreferrer");</script>';
                 // wp_safe_redirect(add_query_arg('success', 'true', wp_get_referer()));
                 // exit;
@@ -306,5 +389,13 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
             'خطا در بارگیری HTML از لینک'
         );
         return (array('status' => false, 'message' => 'Failed to load HTML from the URL.'));
+    }
+    } finally {
+        if ($html) {
+            if (method_exists($html, 'clear')) {
+                $html->clear();
+            }
+            unset($html);
+        }
     }
 }

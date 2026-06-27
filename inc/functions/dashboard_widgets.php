@@ -10,19 +10,19 @@ add_action('wp_dashboard_setup', 'i8_add_dashboard_widgets');
 function i8_add_dashboard_widgets() {
     wp_add_dashboard_widget(
         'i8_dashboard_overview_widget',
-        '📡 دستیار ناشر - شناسنامه و لایسنس',
+        'دستیار ناشر - شناسنامه و لایسنس',
         'i8_dashboard_overview_widget_render'
     );
 
     wp_add_dashboard_widget(
         'i8_dashboard_publishing_widget',
-        '📅 دستیار ناشر - وضعیت انتشار و صف',
+        'دستیار ناشر - وضعیت انتشار و صف',
         'i8_dashboard_publishing_widget_render'
     );
 
     wp_add_dashboard_widget(
         'i8_dashboard_monitoring_widget',
-        '🛠️ دستیار ناشر - پایش منابع و کرون',
+        'دستیار ناشر - پایش منابع و کرون',
         'i8_dashboard_monitoring_widget_render'
     );
 }
@@ -157,84 +157,218 @@ function i8_clear_dashboard_stats_transient() {
 function i8_dashboard_widgets_inline_styles() {
     ?>
     <style>
+        #i8_dashboard_overview_widget h2.hndle,
+        #i8_dashboard_publishing_widget h2.hndle,
+        #i8_dashboard_monitoring_widget h2.hndle {
+            font-family: 'IRANYekanX', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            font-size: 13.5px !important;
+            font-weight: 600 !important;
+            color: #334155 !important;
+            padding: 12px 15px !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            background: #ffffff !important;
+        }
+        
+        /* Modernized widget container styling */
+        #i8_dashboard_overview_widget,
+        #i8_dashboard_publishing_widget,
+        #i8_dashboard_monitoring_widget {
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.01) !important;
+            overflow: hidden !important;
+            background: #ffffff !important;
+        }
+
         .i8-dash-widget {
             direction: rtl;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+            font-family: 'IRANYekanX', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            padding: 6px 2px 2px 2px;
         }
+        
         .i8-dash-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #f1f5f9;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .i8-dash-row:last-child {
-            border-bottom: none;
+        
+        .i8-dash-row:hover {
+            transform: translateY(-1.5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            border-color: #cbd5e1;
         }
+        
         .i8-dash-label {
-            font-size: 13px;
+            font-size: 12.5px;
             color: #64748b;
             font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
+        
         .i8-dash-val {
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 600;
-            color: #1e293b;
+            color: #334155;
         }
+        
         .i8-dash-badge {
             display: inline-flex;
             align-items: center;
-            padding: 3px 8px;
+            padding: 4px 10px;
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 500;
             border-radius: 6px;
+            border: 1px solid transparent;
+            line-height: 1.4;
         }
-        .i8-dash-badge-success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-        .i8-dash-badge-danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-        .i8-dash-badge-warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-        .i8-dash-badge-info { background: rgba(79, 70, 229, 0.1); color: #4f46e5; }
+        
+        .i8-dash-badge-success { 
+            background-color: #f0fdf4; 
+            color: #15803d; 
+            border-color: #bbf7d0; 
+        }
+        
+        .i8-dash-badge-danger { 
+            background-color: #fee2e2; 
+            color: #dc2626; 
+            border-color: #fca5a5; 
+        }
+        
+        .i8-dash-badge-warning { 
+            background-color: #fffbeb; 
+            color: #d97706; 
+            border-color: #fef08a; 
+        }
+        
+        .i8-dash-badge-info { 
+            background-color: #eff6ff; 
+            color: #1d4ed8; 
+            border-color: #bfdbfe; 
+        }
+        
+        .i8-dash-badge-neutral {
+            background-color: #f1f5f9;
+            color: #475569;
+            border-color: #e2e8f0;
+        }
         
         .i8-dash-list {
-            margin-top: 10px;
+            margin-top: 12px;
             padding-right: 0;
             list-style: none;
         }
+        
         .i8-dash-list li {
-            padding: 8px 10px;
-            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            margin-bottom: 8px;
             background: #f8fafc;
             border-radius: 8px;
-            border-right: 3px solid #cbd5e1;
+            border-right: 4px solid #cbd5e1;
             font-size: 12px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            transition: all 0.2s ease;
         }
+        
+        .i8-dash-list li:hover {
+            background: #f1f5f9;
+            transform: translateX(-2px);
+        }
+        
         .i8-dash-list li.success-post {
             border-right-color: #10b981;
         }
+        
         .i8-dash-list li a {
             text-decoration: none;
-            color: #4f46e5;
-            font-weight: 600;
+            color: #1d4ed8;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
         }
+        
         .i8-dash-list li a:hover {
-            text-decoration: underline;
-        }
-        .i8-dash-footer {
-            margin-top: 12px;
-            padding-top: 8px;
-            border-top: 1px solid #e2e8f0;
-            text-align: left;
-        }
-        .i8-dash-link {
-            font-size: 12px;
-            color: #4f46e5;
+            color: #1e40af;
             text-decoration: none;
-            font-weight: 600;
         }
-        .i8-dash-link:hover {
-            text-decoration: underline;
+        
+        .i8-dash-footer {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-start;
+        }
+        
+        .i8-dash-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 14px;
+            font-size: 11.5px;
+            font-weight: 500;
+            text-decoration: none !important;
+            border-radius: 8px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #475569;
+        }
+        
+        .i8-dash-btn:hover {
+            background: #f8fafc;
+            color: #1e293b;
+            border-color: #94a3b8;
+        }
+        
+        .i8-dash-btn-primary {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+        }
+        
+        .i8-dash-btn-primary:hover {
+            background: #dbeafe;
+            color: #1e40af;
+            border-color: #93c5fd;
+        }
+        
+        .i8-dash-btn-danger {
+            background: #fee2e2;
+            color: #dc2626;
+            border-color: #fca5a5;
+        }
+        
+        .i8-dash-btn-danger:hover {
+            background: #fde2e2;
+            color: #b91c1c;
+            border-color: #f87171;
+        }
+        
+        .i8-dash-btn-icon {
+            flex-shrink: 0;
+            opacity: 0.85;
+        }
+        
+        .i8-dash-link-icon {
+            flex-shrink: 0;
+            opacity: 0.7;
         }
     </style>
     <?php
@@ -288,7 +422,7 @@ function i8_dashboard_overview_widget_render() {
         </div>
         <div class="i8-dash-row">
             <span class="i8-dash-label">بازه زمانی صف انتشار:</span>
-            <span class="i8-dash-val" style="direction: ltr;"><?php echo esc_html($start_time . ' - ' . $end_time); ?></span>
+            <span class="i8-dash-val" style="direction: ltr;"><?php echo esc_html(i8_dash_to_persian_num($start_time) . ' - ' . i8_dash_to_persian_num($end_time)); ?></span>
         </div>
         <div class="i8-dash-row">
             <span class="i8-dash-label">انتشار روزانه (تصادفی):</span>
@@ -299,7 +433,10 @@ function i8_dashboard_overview_widget_render() {
             <span class="i8-dash-badge i8-dash-badge-info">هر <?php echo i8_dash_to_persian_num($interval_minutes); ?> دقیقه</span>
         </div>
         <div class="i8-dash-footer">
-            <a href="<?php echo admin_url('admin.php?page=publisher_copoilot_license'); ?>" class="i8-dash-link">⚙️ مدیریت لایسنس و اشتراک</a>
+            <a href="<?php echo admin_url('admin.php?page=publisher_copoilot_license'); ?>" class="i8-dash-btn i8-dash-btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="i8-dash-btn-icon"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <span>مدیریت لایسنس و اشتراک</span>
+            </a>
         </div>
     </div>
     <?php
@@ -349,7 +486,7 @@ function i8_dashboard_publishing_widget_render() {
             <span class="i8-dash-val" title="<?php echo esc_attr($stats['next_post_title']); ?>"><?php echo esc_html($next_post_title_display); ?></span>
         </div>
         
-        <div style="margin-top: 12px; font-weight: 600; font-size: 12px; color: #1e293b;">آخرین انتشارهای موفق:</div>
+        <div style="margin-top: 16px; margin-bottom: 8px; font-weight: 600; font-size: 12.5px; color: #334155;">آخرین انتشارهای موفق:</div>
         <ul class="i8-dash-list">
             <?php if (!empty($stats['last_published'])): ?>
                 <?php foreach ($stats['last_published'] as $pub): 
@@ -360,19 +497,25 @@ function i8_dashboard_publishing_widget_render() {
                 ?>
                     <li class="success-post">
                         <?php if (!empty($pub['link'])): ?>
-                            <a href="<?php echo esc_url($pub['link']); ?>" target="_blank">🔗 <?php echo esc_html($title); ?></a>
+                            <a href="<?php echo esc_url($pub['link']); ?>" target="_blank">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="i8-dash-link-icon"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                <span><?php echo esc_html($title); ?></span>
+                            </a>
                         <?php else: ?>
                             <?php echo esc_html($title); ?>
                         <?php endif; ?>
                     </li>
                 <?php endforeach; ?>
             <?php else: ?>
-                <li style="border-right-color: #cbd5e1; color: #64748b; font-style: italic;">هیچ انتشار موفقی اخیراً ثبت نشده است.</li>
+                <li style="border-right-color: #cbd5e1; color: #64748b; font-style: italic; background: #f8fafc;">هیچ انتشار موفقی اخیراً ثبت نشده است.</li>
             <?php endif; ?>
         </ul>
 
         <div class="i8-dash-footer">
-            <a href="<?php echo admin_url('admin.php?page=publisher-copilot-schedule-queue'); ?>" class="i8-dash-link">📋 مشاهده صف انتشار نوشته‌ها</a>
+            <a href="<?php echo admin_url('admin.php?page=publisher-copilot-schedule-queue'); ?>" class="i8-dash-btn i8-dash-btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="i8-dash-btn-icon"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                <span>مشاهده صف انتشار نوشته‌ها</span>
+            </a>
         </div>
     </div>
     <?php
@@ -430,10 +573,17 @@ function i8_dashboard_monitoring_widget_render() {
             </span>
         </div>
 
-        <div class="i8-dash-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <a href="<?php echo admin_url('admin.php?page=publisher-copilot-monitoring'); ?>" class="i8-dash-link">🚨 پایش خطاها</a>
-            <a href="<?php echo admin_url('admin.php?page=publisher-copilot-report'); ?>" class="i8-dash-link">📊 لاگ رویدادها</a>
+        <div class="i8-dash-footer" style="display: flex; gap: 8px; width: 100%;">
+            <a href="<?php echo admin_url('admin.php?page=publisher-copilot-monitoring'); ?>" class="i8-dash-btn i8-dash-btn-danger" style="flex: 1; justify-content: center;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="i8-dash-btn-icon"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <span>پایش خطاها</span>
+            </a>
+            <a href="<?php echo admin_url('admin.php?page=publisher-copilot-report'); ?>" class="i8-dash-btn i8-dash-btn-primary" style="flex: 1; justify-content: center;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="i8-dash-btn-icon"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                <span>لاگ رویدادها</span>
+            </a>
         </div>
     </div>
     <?php
 }
+

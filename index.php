@@ -37,7 +37,6 @@ require_once (COP_PLUGIN_DIR_PATH . '/inc/functions_loader.php');
 // pages
 include_once (plugin_dir_path(__FILE__) . '/admin-pages/feeds_list.php');
 include_once (plugin_dir_path(__FILE__) . '/admin-pages/setting_page.php');
-include_once (plugin_dir_path(__FILE__) . '/admin-pages/license_page.php');
 include_once (plugin_dir_path(__FILE__) . '/admin-pages/schedule-queue.php');
 
 include_once (plugin_dir_path(__FILE__) . '/inc/scraper/index.php');

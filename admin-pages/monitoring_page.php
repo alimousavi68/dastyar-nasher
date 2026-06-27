@@ -5,7 +5,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Hook to register submenu page
-add_action('admin_menu', 'i8_add_monitoring_submenu_page');
+add_action('admin_menu', 'i8_add_monitoring_submenu_page', 16);
 
 function i8_add_monitoring_submenu_page()
 {
@@ -46,6 +46,14 @@ function i8_manual_check_resource_handler()
 
 function display_monitoring_page()
 {
+    if (!function_exists('i8_to_persian_num')) {
+        function i8_to_persian_num($number) {
+            $english_digits = array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
+            $persian_digits = array('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹');
+            return str_replace($english_digits, $persian_digits, (string)$number);
+        }
+    }
+
     global $wpdb;
     $table_errors = $wpdb->prefix . 'i8_monitoring_errors';
     
@@ -75,438 +83,352 @@ function display_monitoring_page()
     $all_resources = get_resources_details() ?: array();
     
     ?>
+    <link rel="stylesheet" href="<?php echo COP_PLUGIN_URL; ?>/assets/css/feed_list.css">
+    <link rel="stylesheet" href="<?php echo COP_PLUGIN_URL; ?>/assets/css/bootstrap.rtl.min.css">
+    
     <style>
-        :root {
-            --i8-primary: #4f46e5;
-            --i8-primary-hover: #4338ca;
-            --i8-success: #10b981;
-            --i8-danger: #ef4444;
-            --i8-warning: #f59e0b;
-            --i8-neutral-50: #f8fafc;
-            --i8-neutral-100: #f1f5f9;
-            --i8-neutral-800: #1e293b;
-            --i8-glass-bg: rgba(255, 255, 255, 0.75);
-            --i8-glass-border: rgba(226, 232, 240, 0.8);
+        .app-container {
+            max-width: 100% !important;
+            margin: 20px 10px;
         }
-
-        .i8-mon-wrap {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-            margin: 20px 20px 0 0;
-            max-width: 98%;
-            direction: rtl;
-        }
-
-        .i8-mon-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-
-        .i8-title-sec h1 {
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--i8-neutral-800);
-            margin: 0 0 6px 0;
-        }
-
-        .i8-title-sec .description {
-            font-size: 14px;
-            color: #64748b;
-            margin: 0;
-        }
-
-        .i8-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            font-size: 13px;
-            font-weight: 600;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none !important;
-            white-space: nowrap;
-        }
-
-
-        .i8-btn-primary {
-            background: linear-gradient(135deg, var(--i8-primary), #6366f1);
-            color: white;
-            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
-        }
-
-        .i8-btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
-            color: white;
-        }
-
-        .i8-btn-secondary {
-            background: var(--i8-neutral-100);
-            color: var(--i8-neutral-800);
-            border: 1px solid #cbd5e1;
-        }
-
-        .i8-btn-secondary:hover {
-            background: #e2e8f0;
-        }
-
-        /* Stats Grid */
-        .i8-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 20px;
-            margin-bottom: 24px;
-        }
-
-        .i8-stat-card {
-            background: var(--i8-glass-bg);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--i8-glass-border);
+        .stat-card-custom {
+            border: 1px solid var(--tw-slate-200);
             border-radius: 16px;
             padding: 20px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.02);
-            display: flex;
-            align-items: center;
-            gap: 16px;
+            background: #ffffff;
+            box-shadow: var(--tw-shadow-sm);
+            transition: all 0.2s ease;
         }
-
-        .i8-stat-icon {
-            width: 48px;
-            height: 48px;
+        .stat-card-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--tw-shadow-md);
+        }
+        .trace-box-terminal {
+            background: #0f172a !important;
+            color: #38bdf8 !important;
+            font-family: monospace;
+            font-size: 11.5px !important;
+            padding: 16px;
             border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
+            overflow-x: auto;
+            max-height: 250px;
+            border: 1px solid #1e293b;
+            direction: ltr;
+            text-align: left;
+            margin-top: 8px;
         }
-
-        .i8-stat-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .i8-stat-label {
+        .details-custom summary {
+            cursor: pointer;
+            color: #4f46e5;
+            font-weight: 600;
             font-size: 13px;
-            color: #64748b;
-            font-weight: 500;
+            list-style: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            user-select: none;
+            outline: none;
         }
-
-        .i8-stat-value {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--i8-neutral-800);
-            margin-top: 4px;
+        .details-custom summary::-webkit-details-marker {
+            display: none;
         }
-
-        .i8-bg-primary { background: rgba(79, 70, 229, 0.1); color: var(--i8-primary); }
-        .i8-bg-success { background: rgba(16, 185, 129, 0.1); color: var(--i8-success); }
-        .i8-bg-danger { background: rgba(239, 68, 68, 0.1); color: var(--i8-danger); }
-        .i8-bg-warning { background: rgba(245, 158, 11, 0.1); color: var(--i8-warning); }
-
-        /* Container Card */
-        .i8-card {
-            background: white;
-            border-radius: 16px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
-            padding: 24px;
-            margin-bottom: 24px;
+        .details-custom[open] summary {
+            color: #312e81;
         }
-
-        .i8-card-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--i8-neutral-800);
-            margin-bottom: 20px;
-            display: flex;
+        
+        .btn-mon-primary {
+            background-color: #eff6ff !important;
+            color: #1d4ed8 !important;
+            border: 1px solid #bfdbfe !important;
+            border-radius: 12px !important;
+            padding: 10px 18px !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            transition: all 0.2s ease !important;
+            box-shadow: none !important;
+            display: inline-flex;
             align-items: center;
             gap: 8px;
         }
-
-        /* Table */
-        .i8-table-wrapper {
-            overflow-x: auto;
+        .btn-mon-primary:hover {
+            background-color: #1d4ed8 !important;
+            color: #ffffff !important;
+            border-color: #1d4ed8 !important;
+            transform: translateY(-1px);
         }
-
-        .i8-table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: right;
+        .btn-mon-primary svg {
+            transition: transform 0.2s ease;
         }
-
-        .i8-table th {
-            padding: 14px 16px;
-            font-size: 13px;
-            font-weight: 600;
-            color: #64748b;
-            border-bottom: 2px solid #f1f5f9;
-        }
-
-        .i8-table td {
-            padding: 16px;
-            font-size: 13px;
-            color: #334155;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
-        }
-
-        .i8-table th:nth-child(6),
-        .i8-table td:nth-child(6) {
-            min-width: 170px;
-        }
-
-        .i8-trace-details summary {
-            white-space: nowrap;
-            outline: none;
-        }
-
-
-        .i8-table tbody tr:hover {
-            background: #f8fafc;
-        }
-
-        /* Badges */
-        .i8-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 10px;
-            font-size: 11px;
-            font-weight: 600;
-            border-radius: 6px;
-        }
-
-        .i8-badge-success { background: rgba(16, 185, 129, 0.1); color: var(--i8-success); }
-        .i8-badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--i8-danger); }
-        .i8-badge-warning { background: rgba(245, 158, 11, 0.1); color: var(--i8-warning); }
-
-        .i8-trace-details {
-            background: #f8fafc;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 6px 10px;
-            max-width: 450px;
-            transition: all 0.2s ease;
-        }
-
-        .i8-trace-details[open] {
-            background: #ffffff;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        .trace-box {
-            background: #0f172a;
-            color: #38bdf8;
-            font-family: monospace;
-            font-size: 11px;
-            padding: 12px;
-            border-radius: 8px;
-            overflow-x: auto;
-            max-width: 420px;
-            max-height: 120px;
-            white-space: pre-wrap;
-            direction: ltr;
-            text-align: left;
-        }
-
-
-        .healthy-box {
-            text-align: center;
-            padding: 50px 20px;
-        }
-
-        .healthy-icon {
-            font-size: 64px;
-            margin-bottom: 16px;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+        .btn-mon-primary:hover svg {
+            transform: scale(1.1);
         }
     </style>
 
-    <div class="wrap i8-mon-wrap">
+    <div class="app-container">
         <!-- Header -->
-        <div class="i8-mon-header">
-            <div class="i8-title-sec">
-                <h1>مانیتورینگ و پایش خودکار منابع</h1>
-                <p class="description">بررسی زنده و ۲۴ ساعته فیدهای RSS و سلکتورهای استخراج محتوا</p>
+        <div class="sticky-header-bar d-flex flex-wrap flex-xl-nowrap align-items-center justify-content-between gap-3 p-3 mb-4 shadow-sm-soft border bg-white rounded-xl" style="position: sticky; top: 32px; z-index: 100;">
+            <div class="d-flex align-items-center gap-2 pe-xl-3">
+                <div class="radar-container me-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="radar-scanner-icon">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                    <span class="radar-pulse-ring"></span>
+                </div>
+                <div>
+                    <span class="fs-5 fw-bolder text-slate-800" style="white-space: nowrap;">مانیتورینگ و پایش خودکار منابع</span>
+                    <div class="text-slate-500" style="font-size: 12px; margin-top: 2px;">بررسی زنده و ۲۴ ساعته فیدهای RSS و سلکتورهای استخراج محتوا</div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <form action="<?php echo admin_url('admin-post.php'); ?>" method="post" class="m-0">
+                    <input type="hidden" name="action" value="i8_manual_trigger_all_monitoring">
+                    <?php wp_nonce_field('i8_manual_trigger_all_monitoring'); ?>
+                    <button type="submit" class="btn btn-mon-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M5.52.359A.5.5 0 0 1 6 0h4a.5.5 0 0 1 .474.658L8.694 6H12.5a.5.5 0 0 1 .395.807l-7 9a.5.5 0 0 1-.873-.454L6.823 9.5H3.5a.5.5 0 0 1-.48-.641l2.5-8.5z"/>
+                        </svg>
+                        اجرای مانیتورینگ بر روی تمام منابع
+                    </button>
+                </form>
             </div>
         </div>
 
         <!-- Stats Grid -->
-        <div class="i8-stats-grid">
-            <div class="i8-stat-card">
-                <div class="i8-stat-icon i8-bg-primary">📡</div>
-                <div class="i8-stat-info">
-                    <span class="i8-stat-label">کل منابع فعال</span>
-                    <span class="i8-stat-value"><?php echo count($all_resources); ?> منبع</span>
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="stat-card-custom d-flex align-items-center gap-3">
+                    <div class="i8-stat-icon d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(79, 70, 229, 0.1); color: #4f46e5;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 11a9 9 0 0 1 9 9" />
+                            <path d="M4 4a16 16 0 0 1 16 16" />
+                            <circle cx="5" cy="19" r="1" />
+                        </svg>
+                    </div>
+                    <div class="d-flex flex-column">
+                        <span class="text-slate-500" style="font-size: 13px; font-weight: 500;">کل منابع فعال</span>
+                        <span class="text-slate-800 fw-bolder mt-1" style="font-size: 18px;"><?php echo i8_to_persian_num(count($all_resources)); ?> منبع</span>
+                    </div>
                 </div>
             </div>
-            <div class="i8-stat-card">
-                <div class="i8-stat-icon i8-bg-danger">❌</div>
-                <div class="i8-stat-info">
-                    <span class="i8-stat-label">خطاهای فعال (دائمی)</span>
-                    <span class="i8-stat-value"><?php echo count($active_errors); ?> مورد</span>
+            
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="stat-card-custom d-flex align-items-center gap-3">
+                    <div class="i8-stat-icon d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                    </div>
+                    <div class="d-flex flex-column">
+                        <span class="text-slate-500" style="font-size: 13px; font-weight: 500;">خطاهای فعال (دائمی)</span>
+                        <span class="text-slate-800 fw-bolder mt-1" style="font-size: 18px;"><?php echo i8_to_persian_num(count($active_errors)); ?> مورد</span>
+                    </div>
                 </div>
             </div>
-            <div class="i8-stat-card">
-                <div class="i8-stat-icon i8-bg-warning">⏳</div>
-                <div class="i8-stat-info">
-                    <span class="i8-stat-label">در حال بررسی مجدد (موقتی)</span>
-                    <span class="i8-stat-value"><?php echo count($pending_retries); ?> مورد</span>
+            
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="stat-card-custom d-flex align-items-center gap-3">
+                    <div class="i8-stat-icon d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                    </div>
+                    <div class="d-flex flex-column">
+                        <span class="text-slate-500" style="font-size: 13px; font-weight: 500;">در حال بررسی مجدد</span>
+                        <span class="text-slate-800 fw-bolder mt-1" style="font-size: 18px;"><?php echo i8_to_persian_num(count($pending_retries)); ?> مورد</span>
+                    </div>
                 </div>
             </div>
-            <div class="i8-stat-card">
-                <div class="i8-stat-icon i8-bg-success">🛡️</div>
-                <div class="i8-stat-info">
-                    <span class="i8-stat-label">منابع بدون خطا</span>
-                    <span class="i8-stat-value"><?php echo count($all_resources) - count($active_errors); ?> منبع</span>
+            
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="stat-card-custom d-flex align-items-center gap-3">
+                    <div class="i8-stat-icon d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            <path d="m9 11 2 2 4-4" />
+                        </svg>
+                    </div>
+                    <div class="d-flex flex-column">
+                        <span class="text-slate-500" style="font-size: 13px; font-weight: 500;">منابع بدون خطا</span>
+                        <span class="text-slate-800 fw-bolder mt-1" style="font-size: 18px;"><?php echo i8_to_persian_num(count($all_resources) - count($active_errors)); ?> منبع</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Active Errors Card -->
-        <div class="i8-card">
-            <div class="i8-card-title">🚨 خطاهای فعال گزارش‌شده در منابع</div>
-            <div class="i8-table-wrapper">
-                <table class="i8-table">
-                    <thead>
-                        <tr>
-                            <th>نام منبع</th>
-                            <th>نوع خطا</th>
-                            <th>علت و پیام خطا</th>
-                            <th>تاریخ وقوع</th>
-                            <th>موفقیت پیاپی</th>
-                            <th>استک تریس دیباگ</th>
-                            <th>عملیات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($active_errors)): ?>
-                            <?php foreach ($active_errors as $err): 
-                                $date_display = $err['first_occurrence'];
-                                if (class_exists('i8_jDateTime')) {
-                                    $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
-                                    $tz = wp_timezone();
-                                    $tz_name = $tz ? $tz->getName() : 'Asia/Tehran';
-                                    $timestamp = strtotime($err['first_occurrence'] . ' ' . $tz_name);
-                                    if ($timestamp) {
-                                        $date_display = $jdate->date('Y/m/d H:i:s', $timestamp);
-                                    }
-                                }
-                            ?>
-                                <tr>
-                                    <td><strong><?php echo esc_html($err['resource_name']); ?></strong></td>
-                                    <td><span class="i8-badge i8-badge-danger"><?php echo esc_html($err['error_type']); ?></span></td>
-                                    <td><span style="color: #64748b; font-weight: 500;"><?php echo esc_html($err['error_message']); ?></span></td>
-                                    <td style="direction: ltr; text-align: right;"><?php echo esc_html($date_display); ?></td>
-                                    <td>
-                                        <span class="i8-badge i8-badge-success" title="منبع برای پاک شدن خودکار از جدول خطاها، نیاز به ۲ تست موفقیت‌آمیز متوالی دارد." style="cursor: help;">
-                                            <?php echo intval($err['consecutive_success_count']); ?> / ۲ ⓘ
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <details class="i8-trace-details">
-                                            <summary style="cursor: pointer; color: var(--i8-primary); font-weight: 600; font-size: 12px; outline: none; user-select: none;">🔍 مشاهده جزئیات خطا</summary>
-                                            <pre class="trace-box" style="margin-top: 8px;"><?php echo esc_html($err['stack_trace']); ?></pre>
-                                        </details>
-                                    </td>
-
-                                    <td>
-                                        <a href="<?php echo wp_nonce_url(admin_url('admin-post.php?action=i8_manual_check_resource&resource_id=' . $err['resource_id']), 'i8_manual_check_resource'); ?>" class="i8-btn i8-btn-primary">
-                                            🔄 بررسی مجدد
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="7">
-                                    <div class="healthy-box">
-                                        <div class="healthy-icon">💚</div>
-                                        <h3>هیچ خطای فعالی در منابع خبری گزارش نشده است!</h3>
-                                        <p style="color: #64748b;">تمامی سلکتورها و اتصالات منابع خبری به درستی کار می‌کنند.</p>
+        <div class="mb-4">
+            <h2 class="text-slate-800 fw-bolder fs-5 mb-3 d-flex align-items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                خطاهای فعال گزارش‌شده در منابع
+            </h2>
+            
+            <div class="table-body">
+                <?php if (!empty($active_errors)): ?>
+                    <?php foreach ($active_errors as $err): 
+                        $date_display = $err['first_occurrence'];
+                        if (class_exists('i8_jDateTime')) {
+                            $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
+                            $tz = wp_timezone();
+                            $tz_name = $tz ? $tz->getName() : 'Asia/Tehran';
+                            $timestamp = strtotime($err['first_occurrence'] . ' ' . $tz_name);
+                            if ($timestamp) {
+                                $date_display = $jdate->date('Y/m/d H:i:s', $timestamp);
+                            }
+                        }
+                    ?>
+                        <div class="table-item d-flex flex-column gap-3">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                                <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                                    <div style="width: 4px; height: 50px; background-color: #ef4444; border-radius: 4px; flex-shrink: 0;"></div>
+                                    
+                                    <div class="d-flex flex-column gap-2 min-w-0">
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <span class="fs-6 fw-bold text-slate-800"><?php echo esc_html($err['resource_name']); ?></span>
+                                            <span class="badge-status-draft" style="background-color: #fee2e2; color: #dc2626; border-color: #fca5a5; font-size: 11px; padding: 3px 8px; font-weight: bold;"><?php echo esc_html($err['error_type']); ?></span>
+                                            
+                                            <span class="badge-status-published" style="background-color: #f0fdf4; color: #15803d; border-color: #bbf7d0; font-size: 11px; padding: 3px 8px;" title="منبع برای پاک شدن خودکار از جدول خطاها، نیاز به ۲ تست موفقیت‌آمیز متوالی دارد.">
+                                                موفقیت پیاپی: <?php echo i8_to_persian_num(intval($err['consecutive_success_count'])); ?> / ۲
+                                            </span>
+                                        </div>
+                                        
+                                        <div class="text-slate-600 fw-medium" style="font-size: 13.5px;"><?php echo esc_html($err['error_message']); ?></div>
+                                        
+                                        <div class="d-flex align-items-center gap-1 text-slate-400" style="font-size: 12px;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <polyline points="12 6 12 12 16 14" />
+                                            </svg>
+                                            <span>تاریخ وقوع:</span>
+                                            <span style="direction: ltr;"><?php echo esc_html($date_display); ?></span>
+                                        </div>
                                     </div>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                                </div>
+                                
+                                <!-- Actions -->
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <?php if (!empty($err['stack_trace'])): ?>
+                                        <button type="button" class="btn toggle-trace-btn d-flex align-items-center gap-2" data-target="trace-<?php echo esc_attr($err['resource_id']); ?>" style="border-radius: 10px; font-size: 12px; font-weight: bold; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 8px 14px; transition: all 0.2s ease; outline: none; box-shadow: none;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <circle cx="12" cy="12" r="10"/>
+                                                <line x1="12" y1="16" x2="12" y2="12"/>
+                                                <line x1="12" y1="8" x2="12.01" y2="8"/>
+                                            </svg>
+                                            مشاهده جزئیات خطا
+                                        </button>
+                                    <?php endif; ?>
+                                    
+                                    <a href="<?php echo wp_nonce_url(admin_url('admin-post.php?action=i8_manual_check_resource&resource_id=' . $err['resource_id']), 'i8_manual_check_resource'); ?>" class="btn d-flex align-items-center gap-2" style="border-radius: 10px; font-size: 12px; font-weight: bold; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 8px 14px; transition: all 0.2s ease;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M23 4v6h-6"></path>
+                                            <path d="M20.49 15a10 10 0 1 1-2.12-9.36L23 10"></path>
+                                        </svg>
+                                        بررسی مجدد
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- Full Width Stack Trace Box -->
+                            <?php if (!empty($err['stack_trace'])): ?>
+                                <div id="trace-<?php echo esc_attr($err['resource_id']); ?>" style="display: none; border-top: 1px solid var(--tw-slate-200); padding-top: 10px;">
+                                    <pre class="trace-box-terminal"><?php echo esc_html($err['stack_trace']); ?></pre>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="text-center py-5 bg-white border rounded-xl shadow-sm-soft">
+                        <div style="font-size: 48px; margin-bottom: 12px;">💚</div>
+                        <h3 class="fw-bold text-slate-800 fs-5">هیچ خطای فعالی در منابع خبری گزارش نشده است!</h3>
+                        <p class="text-slate-500 mb-0 mt-2">تمامی سلکتورها و اتصالات منابع خبری به درستی کار می‌کنند.</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
-        <!-- Pending Retries Card -->
+        <!-- Pending Retries Section -->
         <?php if (!empty($pending_retries)): ?>
-            <div class="i8-card" style="border-top: 4px solid var(--i8-warning);">
-                <div class="i8-card-title">⏳ بررسی‌های موقت در حال تکرار (تشخیص خطاهای مقطعی)</div>
-                <p style="color: #64748b; font-size: 13px; margin-bottom: 20px;">
+            <div class="mt-5 mb-4">
+                <h2 class="text-slate-800 fw-bolder fs-5 mb-3 d-flex align-items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    بررسی‌های موقت در حال تکرار (تشخیص خطاهای مقطعی)
+                </h2>
+                <p class="text-slate-500" style="font-size: 13px; margin-bottom: 20px;">
                     این منابع اخیراً با خطا مواجه شده‌اند اما برای اطمینان از عدم مقطعی بودن خطا، تا ۳ بار در فواصل ۱۰ دقیقه‌ای تست خواهند شد.
                 </p>
-                <div class="i8-table-wrapper">
-                    <table class="i8-table">
-                        <thead>
-                            <tr>
-                                <th>نام منبع</th>
-                                <th>نوع خطا</th>
-                                <th>علت خطا</th>
-                                <th>تعداد تلاش مجدد</th>
-                                <th>آخرین بررسی</th>
-                                <th>عملیات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                             <?php foreach ($pending_retries as $err): 
-                                 $date_display = $err['last_checked'];
-                                 if (class_exists('i8_jDateTime')) {
-                                     $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
-                                     $tz = wp_timezone();
-                                     $tz_name = $tz ? $tz->getName() : 'Asia/Tehran';
-                                     $timestamp = strtotime($err['last_checked'] . ' ' . $tz_name);
-                                     if ($timestamp) {
-                                         $date_display = $jdate->date('Y/m/d H:i:s', $timestamp);
-                                     }
-                                 }
-                             ?>
-                                <tr>
-                                    <td><strong><?php echo esc_html($err['resource_name']); ?></strong></td>
-                                    <td><span class="i8-badge i8-badge-warning"><?php echo esc_html($err['error_type']); ?></span></td>
-                                    <td style="color: #64748b;"><?php echo esc_html($err['error_message']); ?></td>
-                                    <td><strong><?php echo intval($err['retry_count']); ?> / ۳</strong></td>
-                                    <td style="direction: ltr; text-align: right;"><?php echo esc_html($date_display); ?></td>
-                                    <td>
-                                        <a href="<?php echo wp_nonce_url(admin_url('admin-post.php?action=i8_manual_check_resource&resource_id=' . $err['resource_id']), 'i8_manual_check_resource'); ?>" class="i8-btn i8-btn-secondary">
-                                            🔄 بررسی آنی
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                <div class="table-body">
+                    <?php foreach ($pending_retries as $err): 
+                        $date_display = $err['last_checked'];
+                        if (class_exists('i8_jDateTime')) {
+                            $jdate = new i8_jDateTime(true, true, 'Asia/Tehran');
+                            $tz = wp_timezone();
+                            $tz_name = $tz ? $tz->getName() : 'Asia/Tehran';
+                            $timestamp = strtotime($err['last_checked'] . ' ' . $tz_name);
+                            if ($timestamp) {
+                                $date_display = $jdate->date('Y/m/d H:i:s', $timestamp);
+                            }
+                        }
+                    ?>
+                        <div class="table-item d-flex flex-wrap align-items-center justify-content-between gap-3">
+                            <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                                <div style="width: 4px; height: 50px; background-color: #f59e0b; border-radius: 4px; flex-shrink: 0;"></div>
+                                
+                                <div class="d-flex flex-column gap-2 min-w-0">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="fs-6 fw-bold text-slate-800"><?php echo esc_html($err['resource_name']); ?></span>
+                                        <span class="badge-status-draft" style="background-color: #fffbeb; color: #d97706; border-color: #fef08a; font-size: 11px; padding: 3px 8px; font-weight: bold;"><?php echo esc_html($err['error_type']); ?></span>
+                                        <span class="badge-status-published" style="background-color: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; font-size: 11px; padding: 3px 8px;">
+                                            تعداد تلاش: <?php echo i8_to_persian_num(intval($err['retry_count'])); ?> / ۳
+                                        </span>
+                                    </div>
+                                    <div class="text-slate-600 fw-medium" style="font-size: 13.5px;"><?php echo esc_html($err['error_message']); ?></div>
+                                    <div class="d-flex align-items-center gap-1 text-slate-400" style="font-size: 12px;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <polyline points="12 6 12 12 16 14" />
+                                        </svg>
+                                        <span>آخرین بررسی:</span>
+                                        <span style="direction: ltr;"><?php echo esc_html($date_display); ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <a href="<?php echo wp_nonce_url(admin_url('admin-post.php?action=i8_manual_check_resource&resource_id=' . $err['resource_id']), 'i8_manual_check_resource'); ?>" class="btn d-flex align-items-center gap-2" style="border-radius: 10px; font-size: 12px; font-weight: bold; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 8px 14px; transition: all 0.2s ease;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M23 4v6h-6"></path>
+                                        <path d="M20.49 15a10 10 0 1 1-2.12-9.36L23 10"></path>
+                                    </svg>
+                                    بررسی آنی
+                                </a>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
         <?php endif; ?>
-
-        <!-- Manual Check All Section -->
-        <div class="i8-card">
-            <div class="i8-card-title">🛠️ تست گروهی منابع</div>
-            <p style="color: #64748b; font-size: 13px; margin-bottom: 20px;">
-                شما می‌توانید بررسی کل منابع خبری را به صورت دستی و در لحظه برای تست آغاز کنید.
-            </p>
-            <form action="<?php echo admin_url('admin-post.php'); ?>" method="post">
-                <input type="hidden" name="action" value="i8_manual_trigger_all_monitoring">
-                <?php wp_nonce_field('i8_manual_trigger_all_monitoring'); ?>
-                <button type="submit" class="i8-btn i8-btn-primary">⚡ اجرای مانیتورینگ بر روی تمام منابع</button>
-            </form>
-        </div>
     </div>
+
+    <script>
+        jQuery(document).ready(function ($) {
+            $('.toggle-trace-btn').on('click', function(e) {
+                e.preventDefault();
+                var targetId = $(this).data('target');
+                $('#' + targetId).slideToggle(200);
+            });
+        });
+    </script>
     <?php
 }
 

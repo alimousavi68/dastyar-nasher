@@ -6,12 +6,16 @@ add_action('admin_init', 'custom_rss_parser_create_tables');
 function custom_rss_parser_create_tables()
 {
     global $wpdb;
-    $table_name = $wpdb->prefix . 'custom_rss_items';
-    $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
-    $table_resource_details = $wpdb->prefix . 'custom_resource_details'; // نام جدول جدید
-
-    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+    $installed_ver = get_option("i8_pc_db_version");
+    $current_ver = '1.1.2'; // Force an update again
+    
+    if ($installed_ver != $current_ver) {
+        $table_name = $wpdb->prefix . 'custom_rss_items';
+        $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
+        $table_resource_details = $wpdb->prefix . 'custom_resource_details';
         $charset_collate = $wpdb->get_charset_collate();
+        
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
         $sql = "CREATE TABLE $table_name (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
@@ -20,30 +24,33 @@ function custom_rss_parser_create_tables()
             resource_id mediumint(9) NOT NULL,
             pub_date datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
             guid text NOT NULL,
-            PRIMARY KEY (id)
+            PRIMARY KEY  (id)
         ) $charset_collate;";
-
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
-    }
 
-    if ($wpdb->get_var("SHOW TABLES LIKE '$table_post_schedule'") != $table_post_schedule) {
-        $charset_collate = $wpdb->get_charset_collate();
-
+        // For the queue table, we use explicit ALTER TABLE to ensure columns are added 
+        // since dbDelta can sometimes silently fail on complex modifications
         $sql_2 = "CREATE TABLE $table_post_schedule (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
             post_id mediumint(9) NOT NULL,
             publish_priority tinytext NOT NULL,
-            PRIMARY KEY (id)
+            PRIMARY KEY  (id)
         ) $charset_collate;";
-
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql_2);
-    }
 
-    // ایجاد جدول جدید برای جزئیات منابع
-    if ($wpdb->get_var("SHOW TABLES LIKE '$table_resource_details'") != $table_resource_details) {
-        $charset_collate = $wpdb->get_charset_collate();
+        // Robustly add missing columns
+        $cols = $wpdb->get_col("DESC $table_post_schedule", 0);
+        if (!in_array('status', $cols)) {
+            $wpdb->query("ALTER TABLE $table_post_schedule ADD COLUMN sort_order int(10) unsigned NOT NULL DEFAULT 0");
+            $wpdb->query("ALTER TABLE $table_post_schedule ADD COLUMN scheduled_for datetime DEFAULT NULL");
+            $wpdb->query("ALTER TABLE $table_post_schedule ADD COLUMN as_action_id bigint(20) unsigned DEFAULT NULL");
+            $wpdb->query("ALTER TABLE $table_post_schedule ADD COLUMN status varchar(20) NOT NULL DEFAULT 'queued'");
+            $wpdb->query("ALTER TABLE $table_post_schedule ADD COLUMN attempts tinyint(3) unsigned NOT NULL DEFAULT 0");
+            $wpdb->query("ALTER TABLE $table_post_schedule ADD COLUMN last_error text DEFAULT NULL");
+            $wpdb->query("ALTER TABLE $table_post_schedule ADD COLUMN created_at datetime DEFAULT CURRENT_TIMESTAMP");
+            $wpdb->query("ALTER TABLE $table_post_schedule ADD KEY status_idx (status)");
+            $wpdb->query("ALTER TABLE $table_post_schedule ADD KEY sort_order_idx (sort_order)");
+        }
 
         $sql_3 = "CREATE TABLE $table_resource_details (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
@@ -60,11 +67,11 @@ function custom_rss_parser_create_tables()
             source_root_link varchar(255) DEFAULT NULL,
             source_feed_link varchar(255) DEFAULT NULL,
             need_to_merge_guid_link tinyint(1) DEFAULT 0,
-            PRIMARY KEY (id)
+            PRIMARY KEY  (id)
         ) $charset_collate;";
-
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql_3);
+        
+        update_option("i8_pc_db_version", $current_ver);
     }
 }
 

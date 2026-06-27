@@ -26,27 +26,19 @@ function custom_rss_parser_schedule_event()
         wp_schedule_event(time(), 'daily', 'remove_all_feed_on_feeds_table');
     }
 
-    if (!wp_next_scheduled('set_daily_post_count_for_schedule_task')) {
-        wp_schedule_event(time(), 'daily', 'set_daily_post_count_for_schedule_task');
-    }
 
     // Schedule for Auto Cleaning Reports Weekly
     if (!wp_next_scheduled('i8_weekly_cleanup_reports_event')) {
         wp_schedule_event(time(), 'weekly', 'i8_weekly_cleanup_reports_event');
     }
 
+    // Schedule for Auto Cleaning Queue Daily
+    if (!wp_next_scheduled('i8_daily_cleanup_queue_event')) {
+        wp_schedule_event(time(), 'daily', 'i8_daily_cleanup_queue_event');
+    }
+
 }
 
-
-add_action('set_daily_post_count_for_schedule_task', 'set_daily_post_count_for_schedule_task');
-function set_daily_post_count_for_schedule_task()
-{
-    //error_log('im here: set_daily_post_count_for_schedule_task');
-    $news_interval_start = get_option('news_interval_start') ? intval(get_option('news_interval_start')) : 30;
-    $news_interval_end = get_option('news_interval_end') ? intval(get_option('news_interval_end')) : 40;
-
-    update_option('daily_post_count_for_schedule', rand($news_interval_start, $news_interval_end));
-}
 
 // Hook to handle weekly reports cleanup
 add_action('i8_weekly_cleanup_reports_event', 'i8_weekly_cleanup_reports');
@@ -56,6 +48,17 @@ function i8_weekly_cleanup_reports() {
     $wpdb->query("DELETE FROM $table_name");
     error_log('i8: Auto cleaned up system reports (weekly).');
 }
+
+// Hook to handle daily queue cleanup
+add_action('i8_daily_cleanup_queue_event', 'i8_daily_cleanup_queue');
+function i8_daily_cleanup_queue() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'pc_post_schedule';
+    // Delete published/cancelled records older than 3 days
+    $wpdb->query("DELETE FROM $table_name WHERE status IN ('published', 'cancelled') AND created_at < DATE_SUB(NOW(), INTERVAL 3 DAY)");
+    error_log('i8: Auto cleaned up old queue records (daily).');
+}
+
 
 // Hook to handle the scheduled event
 add_action('custom_rss_parser_event', 'custom_rss_parser_run');
@@ -140,9 +143,13 @@ function i8_crawl_single_feed($feed_id) {
         foreach ($rss_feed->channel->item as $item) {
             $title = isset($item->title) ? (string)$item->title : '';
             
-            // پیشگیری از خطای زمان‌های نامعتبر
+            // پیشگیری از خطای زمان‌های نامعتبر یا ثبت تاریخ در آینده که باعث قفل شدن آیتم در بالای لیست می‌شود
             $raw_date = isset($item->pubDate) ? strtotime((string)$item->pubDate) : time();
-            $pub_date = gmdate('Y-m-d H:i:s', $raw_date ? $raw_date : time());
+            $now_gmt_timestamp = time();
+            if (!$raw_date || $raw_date > $now_gmt_timestamp) {
+                $raw_date = $now_gmt_timestamp;
+            }
+            $pub_date = gmdate('Y-m-d H:i:s', $raw_date);
 
             if (isset($item->guid)) {
                 if ($need_to_merge_guid_link == 1) {
@@ -180,5 +187,7 @@ function i8_crawl_single_feed($feed_id) {
                 $rss_feed ? 'فرمت ساختار فید نامعتبر است (آیتمی یافت نشد).' : $err_msg
             );
         }
+        return 0;
     }
+    return $new_items_count;
 }
