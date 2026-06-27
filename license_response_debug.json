@@ -1,6 +1,6 @@
 {
     "status": "WP_Error",
-    "error_message": "cURL error 28: Connection timed out after 10069 milliseconds",
+    "error_message": "cURL error 28: Connection timed out after 10005 milliseconds",
     "url": "https:\/\/sardabir.online\/wp-json\/license\/v1\/validate\/",
     "secret_code": "i8-CSVYrbi3Qvd1WzBf#",
     "site_url": "http:\/\/localhost:8888\/rasadi"

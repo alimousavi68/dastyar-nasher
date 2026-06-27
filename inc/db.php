@@ -6,13 +6,20 @@ add_action('admin_init', 'custom_rss_parser_create_tables');
 function custom_rss_parser_create_tables()
 {
     global $wpdb;
+    $table_name = $wpdb->prefix . 'custom_rss_items';
+    $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
+    $table_resource_details = $wpdb->prefix . 'custom_resource_details';
+
     $installed_ver = get_option("i8_pc_db_version");
-    $current_ver = '1.1.2'; // Force an update again
-    
-    if ($installed_ver != $current_ver) {
-        $table_name = $wpdb->prefix . 'custom_rss_items';
-        $table_post_schedule = $wpdb->prefix . 'pc_post_schedule';
-        $table_resource_details = $wpdb->prefix . 'custom_resource_details';
+    $current_ver = '1.1.3'; 
+
+    // اگر ورژن دیتابیس قدیمی باشد یا هر یک از جداول در دیتابیس یافت نشود
+    if (
+        $installed_ver != $current_ver ||
+        $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_name)) != $table_name ||
+        $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_post_schedule)) != $table_post_schedule ||
+        $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_resource_details)) != $table_resource_details
+    ) {
         $charset_collate = $wpdb->get_charset_collate();
         
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';

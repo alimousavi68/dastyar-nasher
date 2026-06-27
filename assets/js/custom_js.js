@@ -40,20 +40,25 @@ $(document).ready(function () {
 document.addEventListener("DOMContentLoaded", function () {
     // فعال‌سازی تولتیپ‌ها
     var tooltipTriggerEl = document.getElementById('clear_filters');
-    var tooltip = new bootstrap.Tooltip(tooltipTriggerEl);
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
+    if (tooltipTriggerEl && typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+        var tooltip = new bootstrap.Tooltip(tooltipTriggerEl);
+    }
 
     // تابع پاکسازی فیلترها
-    document.querySelector('.btn-outline-secondary').addEventListener('click', function () {
-        // پاک کردن مقادیر ورودی
-        document.getElementById('search_keyword').value = '';
+    var clearFiltersBtn = document.querySelector('.btn-outline-secondary');
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', function () {
+            // پاک کردن مقادیر ورودی
+            var searchKeyword = document.getElementById('search_keyword');
+            if (searchKeyword) {
+                searchKeyword.value = '';
+            }
 
-        // پاک کردن انتخاب‌های select2
-        $('#category_list').val(null).trigger('change');
-        $('#resource_list').val(null).trigger('change');
-    });
+            // پاک کردن انتخاب‌های select2
+            $('#category_list').val(null).trigger('change');
+            $('#resource_list').val(null).trigger('change');
+        });
+    }
 });
 
 

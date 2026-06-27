@@ -8,9 +8,9 @@ Author: هشت بهشت
 
 // Declare Const Vraibles
 define('COP_PLUGIN_DIR_PATH', plugin_dir_path(__FILE__));
-define('COP_PLUGIN_URL', plugins_url('', __FILE__));
+define('COP_PLUGIN_URL', set_url_scheme(plugins_url('', __FILE__)));
 // تعریف ثابت مسیر پلاگین
-define('DASTYAR_URL', plugin_dir_url(__FILE__));
+define('DASTYAR_URL', set_url_scheme(plugin_dir_url(__FILE__)));
 // تعریف ثابت مسیر عکس‌ها
 define('DASTYAR_ASSETS_IMAGES', DASTYAR_URL . 'assets/images/');
 
