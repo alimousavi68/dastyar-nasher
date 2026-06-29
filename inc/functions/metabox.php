@@ -84,7 +84,9 @@ function cop_set_post_priority_in_manager_meta_box($post_id, $post, $update)
             'ID' => $post->ID,
             'post_status' => 'draft',
         );
+        remove_action('save_post', 'cop_set_post_priority_in_manager_meta_box', 10);
         wp_update_post($post_data);
+        add_action('save_post', 'cop_set_post_priority_in_manager_meta_box', 10, 3);
         $updating_post = false;
     } elseif ($priority_value == 'now') {
 
@@ -94,19 +96,29 @@ function cop_set_post_priority_in_manager_meta_box($post_id, $post, $update)
             i8_delete_item_at_scheulde_list(null, $post_id);
         }
 
-        date_default_timezone_set('Asia/Tehran');
+        $tz = wp_timezone();
         $random_interval = rand(400, 900);
         $publish_time = time() + $random_interval;
+
+        $date = new DateTime('@' . $publish_time);
+        $date->setTimezone($tz);
+        $post_date_str = $date->format('Y-m-d H:i:s');
+
+        $date_gmt = new DateTime('@' . $publish_time);
+        $date_gmt->setTimezone(new DateTimeZone('UTC'));
+        $post_date_gmt_str = $date_gmt->format('Y-m-d H:i:s');
 
         // Prepare data for creating a WordPress post
         $post_data = array(
             'ID' => $post->ID,
             'post_status' => 'future',
-            'post_date' => date('Y-m-d H:i:s', $publish_time), // استفاده از زمان تصادفی برای post_date
-            'post_date_gmt' => gmdate('Y-m-d H:i:s', $publish_time), // استفاده از زمان تصادفی برای post_date_gmt
+            'post_date' => $post_date_str, // استفاده از زمان تصادفی برای post_date
+            'post_date_gmt' => $post_date_gmt_str, // استفاده از زمان تصادفی برای post_date_gmt
         );
 
+        remove_action('save_post', 'cop_set_post_priority_in_manager_meta_box', 10);
         wp_update_post($post_data);
+        add_action('save_post', 'cop_set_post_priority_in_manager_meta_box', 10, 3);
         $updating_post = false;
     }
 }
