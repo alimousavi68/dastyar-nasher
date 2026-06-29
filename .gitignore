@@ -1,0 +1,8 @@
+# Ignore license debug files
+license_response_debug.json
+
+# IDEs and OS files
+.DS_Store
+.vscode/
+.idea/
+*.log

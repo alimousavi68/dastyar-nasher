@@ -1,7 +1,0 @@
-{
-    "status": "WP_Error",
-    "error_message": "cURL error 6: Could not resolve host: sardabir.online",
-    "url": "https:\/\/sardabir.online\/wp-json\/license\/v1\/validate\/",
-    "secret_code": "i8-CSVYrbi3Qvd1WzBf#",
-    "site_url": "http:\/\/localhost:8888\/rasadi"
-}
