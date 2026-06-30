@@ -32,7 +32,7 @@ if ($results):
         $pub_date = '-';
         $pub_time = '-';
         if ($item->scheduled_for) {
-            $local_date_str = get_date_from_gmt($item->scheduled_for);
+            $local_date_str = function_exists('i8_get_local_time_from_gmt') ? i8_get_local_time_from_gmt($item->scheduled_for) : get_date_from_gmt($item->scheduled_for);
             $fake_timestamp = strtotime($local_date_str . ' UTC');
             if (class_exists('i8_jDateTime')) {
                 $jdate = new i8_jDateTime(true, true, 'UTC');

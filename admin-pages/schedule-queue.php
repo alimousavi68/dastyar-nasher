@@ -227,7 +227,7 @@ function pc_schedule_queue_page_callback() {
                 <?php
                 $next_run = $wpdb->get_row("SELECT scheduled_for FROM $table WHERE status IN ('queued', 'scheduled') ORDER BY sort_order ASC, id ASC LIMIT 1");
                 if ($next_run && $next_run->scheduled_for) {
-                    $local_date_str = get_date_from_gmt($next_run->scheduled_for);
+                    $local_date_str = function_exists('i8_get_local_time_from_gmt') ? i8_get_local_time_from_gmt($next_run->scheduled_for) : get_date_from_gmt($next_run->scheduled_for);
                     $fake_timestamp = strtotime($local_date_str . ' UTC');
                     if (class_exists('i8_jDateTime')) {
                         $jdate = new i8_jDateTime(true, true, 'UTC');

@@ -259,13 +259,12 @@ function i8_get_next_available_publishing_slot() {
         $last_record = $wpdb->get_row("SELECT scheduled_for FROM $table WHERE status = 'scheduled' ORDER BY scheduled_for DESC LIMIT 1");
         
         if ($last_record && $last_record->scheduled_for) {
-            // Assume scheduled_for is UTC, convert to local timestamp if needed
-            // Actually, we store it via gmdate above, so we parse it as GMT
             $base_time = strtotime($last_record->scheduled_for . ' GMT');
         }
     }
     
-    $next_timestamp = max(time(), $base_time + $interval);
+    // Ensure we schedule in the future
+    $next_timestamp = max(time() + 10, $base_time + $interval);
     $adjusted_timestamp = i8_adjust_timestamp_to_working_hours($next_timestamp);
     $last_scheduled_timestamp = $adjusted_timestamp;
     return $adjusted_timestamp;
@@ -275,7 +274,12 @@ function i8_get_next_available_publishing_slot() {
  * Adjust timestamp to working hours safely
  */
 function i8_adjust_timestamp_to_working_hours($timestamp) {
+    // Get the site timezone (Tehran fallback if UTC is active but Persian language is set)
     $tz = wp_timezone();
+    if ($tz->getName() === 'UTC' && function_exists('get_locale') && strpos(get_locale(), 'fa') === 0) {
+        $tz = new DateTimeZone('Asia/Tehran');
+    }
+
     $start_time_str = get_option('start_cron_time', '08:00');
     $end_time_str = get_option('end_cron_time', '22:00');
     
@@ -410,4 +414,21 @@ function cop_update_post_priority($post_id, $new_priority) {
         array('publish_priority' => $new_priority),
         array('post_id' => $post_id)
     );
+}
+
+/**
+ * Get local time string from GMT/UTC date string with Persian timezone fallback support
+ */
+function i8_get_local_time_from_gmt($gmt_date_str, $format = 'Y-m-d H:i:s') {
+    $tz = wp_timezone();
+    if ($tz->getName() === 'UTC' && function_exists('get_locale') && strpos(get_locale(), 'fa') === 0) {
+        $tz = new DateTimeZone('Asia/Tehran');
+    }
+    try {
+        $date = new DateTime($gmt_date_str, new DateTimeZone('UTC'));
+        $date->setTimezone($tz);
+        return $date->format($format);
+    } catch (Exception $e) {
+        return $gmt_date_str;
+    }
 }
