@@ -137,7 +137,7 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
         if ($html_content == '') {
             insert_rss_report('درخواست واکشی یک پست', $encoded_url, 123, '0', 'خطایی با این کد صادر شد: فایل html خالی است');
         } else {
-            $html = str_get_html($html_content);
+            $html = true; // Flag for legacy checks
         }
 
         // return array('code' => '301', 'new_location' => $headers['Location']);
@@ -166,7 +166,7 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
         if ($html_content == '') {
             insert_rss_report('درخواست واکشی یک پست', $encoded_url, 123, '0', 'خطایی با این کد صادر شد: فایل html خالی است');
         } else {
-            $html = str_get_html($html_content);
+            $html = true; // Flag for legacy checks
         }
     }
 
@@ -174,20 +174,18 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
     // Check if HTML is successfu   lly loaded
     if ($html) {
 
-        // Find and extract the required elements
-        
-        // انتخاب المان h1 با کلاس "title" و مشخصه itemprop="headline"
-        $title_element = $html->find($title_selector, 0);
+        // ایجاد DOMDocument برای استفاده از XPath بجای Simple HTML DOM
+        $dom = new DOMDocument();
+        libxml_use_internal_errors(true);
+        $content_type_handled_html = mb_convert_encoding($html_content, 'HTML-ENTITIES', 'UTF-8');
+        @$dom->loadHTML($content_type_handled_html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        $xpath = new DOMXPath($dom);
 
-        // بررسی وجود المان قبل از استفاده از تابع find()
-        if ($title_element) {
-            // دریافت  متن موجود در المان
-            $title = $title_element->plaintext;
-            
-        } else {
-            // در صورت عدم وجود المان، مقدار پیشفرض یا اقدام مناسب دیگر
-            $title = '';
-            // insert rss report error for this section
+        // Find and extract the required elements
+        $title = trim(strip_tags(dastyar_extract_by_selector($xpath, $title_selector)));
+        
+        if (empty($title)) {
             $report_id = insert_rss_report(
                 'درخواست واکشی یک پست',
                 $encoded_url,
@@ -197,12 +195,9 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
             );
         }
 
-        if ($html->find($lead_selector, 0) != null) {
-            $excerpt = $html->find($lead_selector, 0);
-            $excerpt = trim($excerpt->plaintext);
-        } else {
-            $excerpt = '';
-            // insert rss report error for this section
+        $excerpt = trim(strip_tags(dastyar_extract_by_selector($xpath, $lead_selector)));
+        
+        if (empty($excerpt) && !empty($lead_selector)) {
             $report_id = insert_rss_report(
                 'درخواست واکشی یک پست',
                 $encoded_url,
@@ -212,12 +207,11 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
             );
         }
 
-        if ($html->find($body_selector, 0) != null) {
-            $content = $html->find($body_selector, 0);
-            $content = clear_not_allowed_tags($content->innertext, $source_root_link);
+        $content_raw = dastyar_extract_by_selector($xpath, $body_selector);
+        if (!empty($content_raw)) {
+            $content = clear_not_allowed_tags($content_raw, $source_root_link);
         } else {
             $content = '';
-            // insert rss report error for this section
             $report_id = insert_rss_report(
                 'درخواست واکشی یک پست',
                 $encoded_url,
@@ -227,12 +221,39 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
             );
         }
 
-        $img_element = $html->find($img_selector, 0);
-        if ($img_element && $img_element->src != null) {
-            $thumbnail_url = $img_element->src;
-        } else {
-            $thumbnail_url = '';
-            // insert rss report error for this section
+        $thumbnail_url = '';
+        $img_xpath_query = dastyar_css_to_xpath($img_selector);
+        if (!empty($img_xpath_query)) {
+            $nodes = $xpath->query($img_xpath_query);
+            if ($nodes && $nodes->length > 0) {
+                $img_node = $nodes->item(0);
+                $tag_name = strtolower($img_node->nodeName);
+                if ($tag_name === 'meta') {
+                    $thumbnail_url = trim($img_node->getAttribute('content'));
+                } elseif ($tag_name === 'img') {
+                    $thumbnail_url = trim($img_node->getAttribute('src'));
+                    if (empty($thumbnail_url)) $thumbnail_url = trim($img_node->getAttribute('data-src'));
+                    if (empty($thumbnail_url)) $thumbnail_url = trim($img_node->getAttribute('data-lazy-src'));
+                    if (empty($thumbnail_url)) {
+                        $srcset = trim($img_node->getAttribute('srcset'));
+                        if (!empty($srcset)) {
+                            $srcset_parts = preg_split('/\s+/', $srcset);
+                            if (!empty($srcset_parts[0])) $thumbnail_url = $srcset_parts[0];
+                        }
+                    }
+                } else {
+                    $sub_imgs = $xpath->query('.//img', $img_node);
+                    if ($sub_imgs && $sub_imgs->length > 0) {
+                        $sub_img = $sub_imgs->item(0);
+                        $thumbnail_url = trim($sub_img->getAttribute('src'));
+                        if (empty($thumbnail_url)) $thumbnail_url = trim($sub_img->getAttribute('data-src'));
+                        if (empty($thumbnail_url)) $thumbnail_url = trim($sub_img->getAttribute('data-lazy-src'));
+                    }
+                }
+            }
+        }
+        
+        if (empty($thumbnail_url) && !empty($img_selector)) {
             $report_id = insert_rss_report(
                 'درخواست واکشی یک پست',
                 $encoded_url,
@@ -445,12 +466,13 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
         );
         return (array('status' => false, 'message' => 'Failed to load HTML from the URL.'));
     }
+        // Remove simple_html_dom specific cleanup since we removed it
     } finally {
-        if ($html) {
-            if (method_exists($html, 'clear')) {
-                $html->clear();
-            }
-            unset($html);
+        if (isset($html) && is_object($html) && method_exists($html, 'clear')) {
+            $html->clear();
         }
+        unset($html);
+        unset($dom);
+        unset($xpath);
     }
 }

@@ -256,3 +256,123 @@ function encode_persian_chracter_allowed_url($url)
     }, $url);
     return $encoded_url;
 }
+<?php
+/**
+ * Extract single element by CSS/XPath selector
+ */
+function dastyar_extract_by_selector($xpath_obj, $selector, $attr = '') {
+    $xpath_query = dastyar_css_to_xpath($selector);
+    if (empty($xpath_query)) {
+        return '';
+    }
+
+    $nodes = $xpath_obj->query($xpath_query);
+    if ($nodes === false || $nodes->length === 0) {
+        return '';
+    }
+
+    $node = $nodes->item(0);
+    $tag_name = strtolower($node->nodeName);
+
+    if ($tag_name === 'meta' && empty($attr)) {
+        return trim($node->getAttribute('content'));
+    }
+
+    if (!empty($attr)) {
+        return trim($node->getAttribute($attr));
+    }
+    
+    // For body extraction, we might need inner HTML instead of just textContent?
+    // Wait, the client plugin uses $html->find($body_selector, 0)->innertext
+    // DOMXPath does not have a native innerHTML property.
+    return dastyar_get_inner_html($node);
+}
+
+function dastyar_get_inner_html($node) {
+    $innerHTML = "";
+    $children  = $node->childNodes;
+    foreach ($children as $child) {
+        $innerHTML .= $node->ownerDocument->saveHTML($child);
+    }
+    return $innerHTML;
+}
+
+function dastyar_css_to_xpath($selector) {
+    if (empty($selector)) return '';
+    if (strpos($selector, '//') === 0) return $selector; // Already XPath
+
+    $selector = trim($selector);
+    $selector = preg_replace('/\s*>\s*/', ' > ', $selector);
+    $selector = preg_replace('/\s+/', ' ', $selector);
+
+    $parts = explode(' ', $selector);
+    $xpath_parts = [];
+    $next_is_child = false;
+
+    foreach ($parts as $part) {
+        $part = trim($part);
+        if ($part === '>') {
+            $next_is_child = true;
+            continue;
+        }
+
+        $xpath_part = dastyar_parse_single_css_part($part);
+        
+        if (empty($xpath_parts)) {
+            $xpath_parts[] = '//' . $xpath_part;
+        } else {
+            if ($next_is_child) {
+                $xpath_parts[] = '/' . $xpath_part;
+                $next_is_child = false;
+            } else {
+                $xpath_parts[] = '//' . $xpath_part;
+            }
+        }
+    }
+    return implode('', $xpath_parts);
+}
+
+function dastyar_parse_single_css_part($part) {
+    $tag = '*';
+    if (preg_match('/^[a-zA-Z0-9\-]+/', $part, $matches)) {
+        $tag = $matches[0];
+        $part = substr($part, strlen($tag));
+    }
+
+    $conditions = [];
+
+    if (preg_match_all('/#([a-zA-Z0-9\-_]+)/', $part, $matches)) {
+        foreach ($matches[1] as $id) {
+            $conditions[] = "@id='$id'";
+        }
+    }
+
+    if (preg_match_all('/\.([a-zA-Z0-9\-_]+)/', $part, $matches)) {
+        foreach ($matches[1] as $class) {
+            $conditions[] = "contains(concat(' ', normalize-space(@class), ' '), ' $class ')";
+        }
+    }
+
+    if (preg_match_all('/\[([a-zA-Z\-]+)=["\']?([^"\'\]]+)["\']?\]/', $part, $matches)) {
+        foreach ($matches[1] as $i => $attr) {
+            $val = $matches[2][$i];
+            $conditions[] = "@$attr='$val'";
+        }
+    }
+    
+    $index = null;
+    if (preg_match('/:nth-of-type\((\d+)\)/', $part, $matches)) {
+        $index = $matches[1];
+    }
+
+    $result = $tag;
+    if (!empty($conditions)) {
+        $result .= '[' . implode(' and ', $conditions) . ']';
+    }
+    
+    if ($index !== null) {
+        $result .= '[' . $index . ']';
+    }
+
+    return $result;
+}
