@@ -256,7 +256,6 @@ function encode_persian_chracter_allowed_url($url)
     }, $url);
     return $encoded_url;
 }
-<?php
 /**
  * Extract single element by CSS/XPath selector
  */
