@@ -271,8 +271,8 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
 
         //error_log('post_status here:' . $post_status);
 
-        // Check if all required elements are found
-        if ($title && $excerpt && $content && $thumbnail_url) {
+        // Check if all required elements are found (image is now optional)
+        if ($title && $excerpt && $content) {
             if ($publish_priority == 'now') {
                 $publish_time = time();
             } else {
@@ -334,8 +334,8 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
                 return array('status' => false, 'message' => 'خطایی در حین ایجاد پست پیش آمده است..' . $e->getMessage());
             }
 
-            // Upload and set the featured image
-            if ($post_id && function_exists('media_sideload_image')) {
+            // Upload and set the featured image (only if URL exists)
+            if (!empty($thumbnail_url) && $post_id && function_exists('media_sideload_image')) {
                 $thumbnail_url = complete_url($thumbnail_url, $source_root_link);
 
                 ob_start();
@@ -344,28 +344,27 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
 
                 if (!is_wp_error($attachment_id)) {
                     set_post_thumbnail($post_id, $attachment_id);
-                } elseif (is_wp_error($attachment_id)) {
+                } else {
                     // insert rss report error for this section
                     $report_id = insert_rss_report(
                         'درخواست واکشی یک پست',
                         $encoded_url,
                         123,
                         '0',
-                        'خطایی در حین آپلود عکس پیش آمده است. لطفا با پشتیبانی تماس بگیرید.',
+                        'خطایی در حین آپلود عکس پیش آمده است: ' . $attachment_id->get_error_message()
                     );
-                    return (array('status' => false, 'message' => 'خطایی در حین آپلود عکس پیش آمده است: ' . $attachment_id->get_error_message()));
+                    // به مسیر ادامه می‌دهیم و پست منتشر می‌شود
                 }
-            } elseif (!function_exists('media_sideload_image')) {
-                // return (array('status' => false, 'message' => 'media_sideload_image() function is not available.'));
-                // //error_log('media_sideload_image() function is not available.');
+            } elseif (!empty($thumbnail_url) && !function_exists('media_sideload_image')) {
                 // insert rss report error for this section
                 $report_id = insert_rss_report(
                     'درخواست واکشی یک پست',
                     $encoded_url,
                     123,
                     '0',
-                    'media_sideload_image() function is not available.'
+                    'تابع media_sideload_image() در دسترس نیست.'
                 );
+                // به مسیر ادامه می‌دهیم و پست منتشر می‌شود
             }
 
             // Output success or failure message
