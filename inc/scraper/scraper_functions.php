@@ -375,3 +375,71 @@ function dastyar_parse_single_css_part($part) {
 
     return $result;
 }
+
+
+/**
+ * بررسی HTTP status code یک URL با یک درخواست HEAD سبک
+ *
+ * @param string $url
+ * @return int کد HTTP یا ۰ در صورت خطا
+ */
+function i8_check_url_http_status($url) {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_NOBODY, true); // HEAD request
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return (int) $http_code;
+}
+
+/**
+ * تعیین هوشمند آدرس نهایی یک آیتم فید با اولویت‌بندی guid و link
+ *
+ * منطق:
+ * ۱. اگر guid آدرس کامل (absolute) بود → مستقیم استفاده شود
+ * ۲. اگر guid آدرس نسبی بود → با source_root_link ترکیب شود؛
+ *    سپس HTTP status چک می‌شود؛ اگر ۴۰۴ یا خطا داد → به link فال‌بک می‌شود
+ * ۳. اگر guid خالی بود → از link استفاده شود
+ * ۴. اگر هر دو خالی بودند → رشته خالی برگردانده می‌شود
+ *
+ * @param string $guid_str   مقدار تگ <guid> از فید
+ * @param string $link_str   مقدار تگ <link> از فید
+ * @param string $root_url   آدرس پایه (root) منبع خبری (مثلاً https://safheeghtesad.ir)
+ * @return string  آدرس نهایی معتبر یا رشته خالی
+ */
+function i8_resolve_feed_item_url($guid_str, $link_str, $root_url) {
+    $guid_str = trim((string) $guid_str);
+    $link_str = trim((string) $link_str);
+    $root_url = rtrim(trim((string) $root_url), '/');
+
+    // حالت ۱: guid آدرس کامل و معتبر است
+    if (!empty($guid_str) && preg_match('#^https?://#i', $guid_str)) {
+        return $guid_str;
+    }
+
+    // حالت ۲: guid آدرس نسبی است، ترکیب با root_url
+    if (!empty($guid_str) && !empty($root_url)) {
+        $merged_url = $root_url . '/' . ltrim($guid_str, '/');
+        $status = i8_check_url_http_status($merged_url);
+        // HTTP 2xx و 3xx به عنوان موفق تلقی می‌شوند
+        if ($status >= 200 && $status < 400) {
+            return $merged_url;
+        }
+        // آدرس ترکیبی نامعتبر بود → فال‌بک به link
+        error_log('i8: guid نسبی (' . $guid_str . ') → آدرس ترکیبی (' . $merged_url . ') با کد HTTP ' . $status . ' رد شد؛ فال‌بک به <link>.');
+    }
+
+    // حالت ۳: از link استفاده می‌شود
+    if (!empty($link_str)) {
+        return $link_str;
+    }
+
+    // حالت ۴: هیچ آدرس معتبری یافت نشد
+    return '';
+}

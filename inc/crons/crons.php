@@ -151,16 +151,13 @@ function i8_crawl_single_feed($feed_id) {
             }
             $pub_date = gmdate('Y-m-d H:i:s', $raw_date);
 
-            if (isset($item->guid)) {
-                if ($need_to_merge_guid_link == 1) {
-                    $guid = $source_root_link . (string)$item->guid;
-                } else {
-                    $guid = (string)$item->guid;
-                }
-            } elseif (isset($item->link)) {
-                $guid = (string)$item->link;
-            } else {
-                continue; // اگر شناسه یکتایی نبود، عبور کن
+            // تعیین هوشمند آدرس: guid کامل، guid نسبی + root، فال‌بک به link
+            $guid_raw = isset($item->guid) ? (string) $item->guid : '';
+            $link_raw = isset($item->link) ? (string) $item->link : '';
+            $guid = i8_resolve_feed_item_url($guid_raw, $link_raw, $source_root_link);
+
+            if (empty($guid)) {
+                continue; // اگر هیچ آدرس معتبری یافت نشد، عبور کن
             }
 
             if (function_exists('custom_rss_parser_item_exists') && !custom_rss_parser_item_exists($guid)) {
