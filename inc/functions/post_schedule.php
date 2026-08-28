@@ -187,8 +187,19 @@ function i8_publish_specific_post_callback($post_id) {
     $wpdb->update($table, array('status' => 'publishing'), array('id' => $post_record->id));
     
     $post_status = get_post_status($post_id);
+    
+    // اگر پست قبلاً منتشر شده، یعنی Action Scheduler این action را دوباره اجرا کرده
+    // → رکورد را published می‌زنیم (نه cancelled) و خارج می‌شویم
+    if ($post_status === 'publish' || $post_status === 'future') {
+        $wpdb->update($table, array('status' => 'published'), array('id' => $post_record->id));
+        i8_action_log(sprintf('پست %d قبلاً منتشر شده بود؛ رکورد صف بدون تغییر تأیید شد.', $post_id));
+        return;
+    }
+
     if ($post_status !== 'draft' && $post_status !== 'pending') {
-        $wpdb->update($table, array('status' => 'cancelled', 'last_error' => 'پست در وضعیت پیش‌نویس یا در انتظار بررسی نبود'), array('id' => $post_record->id));
+        // پست حذف شده یا در وضعیت غیرقابل انتشار است → حذف رکورد از صف
+        $wpdb->delete($table, array('id' => $post_record->id));
+        i8_action_log(sprintf('پست %d در وضعیت "%s" است و قابل انتشار نیست؛ رکورد از صف حذف شد.', $post_id, $post_status));
         return;
     }
 
@@ -213,7 +224,9 @@ function i8_publish_specific_post_callback($post_id) {
             $action_id = as_schedule_single_action($retry_time, 'i8_action_publish_specific_post', array('post_id' => $post_id), 'i8_post_publisher');
             $wpdb->update($table, array('status' => 'scheduled', 'as_action_id' => $action_id, 'scheduled_for' => gmdate('Y-m-d H:i:s', $retry_time)), array('id' => $post_record->id));
         } else {
-            $wpdb->update($table, array('status' => 'cancelled', 'attempts' => $attempts, 'last_error' => 'حداکثر تلاش رسید: ' . $error_msg), array('id' => $post_record->id));
+            // بعد از ۳ تلاش ناموفق، رکورد را حذف می‌کنیم تا صف کثیف نشود
+            $wpdb->delete($table, array('id' => $post_record->id));
+            i8_action_log(sprintf('پست %d بعد از ۳ تلاش ناموفق از صف حذف شد: %s', $post_id, $error_msg));
         }
     } else {
         $wpdb->update($table, array('status' => 'published'), array('id' => $post_record->id));
