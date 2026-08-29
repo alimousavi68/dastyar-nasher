@@ -117,7 +117,7 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
     // $bup_date_selector = get_resource_data($resource_id, 'bup_date_selector');
     // $category_selector = get_resource_data($resource_id, 'category_selector');
     // $tags_selector = get_resource_data($resource_id, 'tags_selector');
-    // $escape_elements = get_resource_data($resource_id, 'escape_elements');
+    $escape_elements = get_resource_data($resource_id, 'escape_elements');
     // $source_feed_link = get_resource_data($resource_id, 'source_feed_link');
     // $need_to_merge_guid_link = get_resource_data($resource_id, 'need_to_merge_guid_link');
 
@@ -207,20 +207,7 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
             );
         }
 
-        $content_raw = dastyar_extract_by_selector($xpath, $body_selector);
-        if (!empty($content_raw)) {
-            $content = clear_not_allowed_tags($content_raw, $source_root_link);
-        } else {
-            $content = '';
-            $report_id = insert_rss_report(
-                'درخواست واکشی یک پست',
-                $encoded_url,
-                123,
-                '0',
-                'بدنه پست پیدا نشد'
-            );
-        }
-
+        // 1. اول تصویر شاخص را استخراج می‌کنیم (تا بر اثر حذف المان‌ها از بین نرود)
         $thumbnail_url = '';
         $img_xpath_query = dastyar_css_to_xpath($img_selector);
         if (!empty($img_xpath_query)) {
@@ -260,6 +247,60 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
                 123,
                 '0',
                 'عکس پست پیدا نشد'
+            );
+        }
+
+        // 2. دوم، اعمال Escape Elements (حذف المان‌های ناخواسته از DOM)
+        $escape_selectors = array();
+        if (!empty($escape_elements)) {
+            $decoded = json_decode($escape_elements, true);
+            if (is_array($decoded)) {
+                $escape_selectors = $decoded;
+            } elseif (is_string($escape_elements)) {
+                // backward compat
+                $escape_selectors = array_filter(array_map('trim', explode("\n", $escape_elements)));
+            }
+        }
+
+        if (!empty($escape_selectors)) {
+            $removed_count = 0;
+            foreach ($escape_selectors as $esc_selector) {
+                $esc_selector = trim($esc_selector);
+                if (empty($esc_selector)) continue;
+                
+                $esc_xpath = dastyar_css_to_xpath($esc_selector);
+                if (empty($esc_xpath)) continue;
+                
+                $esc_nodes = @$xpath->query($esc_xpath);
+                if ($esc_nodes && $esc_nodes->length > 0) {
+                    // حذف از آخر به اول
+                    for ($i = $esc_nodes->length - 1; $i >= 0; $i--) {
+                        $node = $esc_nodes->item($i);
+                        if ($node && $node->parentNode) {
+                            $node->parentNode->removeChild($node);
+                            $removed_count++;
+                        }
+                    }
+                }
+            }
+            if ($removed_count > 0) {
+                error_log("Escape Elements: {$removed_count} nodes removed from {$encoded_url}");
+            }
+        }
+
+        // 3. سوم، استخراج بدنه خبر از DOM پاکسازی شده
+        $content_raw = dastyar_extract_by_selector($xpath, $body_selector);
+        if (!empty($content_raw)) {
+            $content = clear_not_allowed_tags($content_raw, $source_root_link);
+        } else {
+            $content = '';
+            // اگر بعد از اعمال escape بدنه خالی شد، گزارش می‌دهیم
+            $report_id = insert_rss_report(
+                'درخواست واکشی یک پست',
+                $encoded_url,
+                123,
+                '0',
+                'بدنه پست پیدا نشد' . (!empty($escape_selectors) ? ' (احتمالاً توسط Escape Elements حذف شده)' : '')
             );
         }
 

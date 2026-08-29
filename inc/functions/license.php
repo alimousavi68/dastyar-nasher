@@ -122,7 +122,7 @@ function update_resources_details($data_array)
                 'bup_date_selector' => $data['bup_date_selector'],
                 'category_selector' => $data['category_selector'],
                 'tags_selector' => $data['tags_selector'],
-                'escape_elements' => $data['escape_elements'],
+                'escape_elements' => !empty($data['escape_elements']) ? $data['escape_elements'] : '[]',
                 'source_root_link' => $data['source_root_link'],
                 'source_feed_link' => $data['source_feed_link'],
                 'need_to_merge_guid_link' => $data['need_to_merge_guid_link']
