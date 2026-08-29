@@ -352,10 +352,20 @@ function dastyar_parse_single_css_part($part) {
         }
     }
 
-    if (preg_match_all('/\[([a-zA-Z\-]+)=["\']?([^"\'\]]+)["\']?\]/', $part, $matches)) {
+    if (preg_match_all('/\[([a-zA-Z\-]+)([*^$]?)=["\']?([^"\'\]]+)["\']?\]/', $part, $matches)) {
         foreach ($matches[1] as $i => $attr) {
-            $val = $matches[2][$i];
-            $conditions[] = "@$attr='$val'";
+            $operator = $matches[2][$i];
+            $val = $matches[3][$i];
+            if ($operator === '*') {
+                $conditions[] = "contains(@$attr, '$val')";
+            } elseif ($operator === '^') {
+                $conditions[] = "starts-with(@$attr, '$val')";
+            } elseif ($operator === '$') {
+                // XPath 1.0 does not have ends-with, so we simulate it
+                $conditions[] = "substring(@$attr, string-length(@$attr) - string-length('$val') + 1) = '$val'";
+            } else {
+                $conditions[] = "@$attr='$val'";
+            }
         }
     }
     
