@@ -272,22 +272,9 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
                         $result = array_merge($result, $flatten_escape($decoded));
                         continue;
                     }
-                    
-                    $inner = trim(substr($item, 1, -1));
-                    preg_match_all('/"(.*?)"|\'(.*?)\'|([^,\s]+)/', $inner, $matches);
-                    $extracted = array();
-                    if (!empty($matches[0])) {
-                        foreach ($matches[0] as $m) {
-                            $m = trim($m, "'\" \t\n\r\0\x0B");
-                            if (!empty($m)) {
-                                $extracted[] = $m;
-                            }
-                        }
-                    }
-                    if (!empty($extracted)) {
-                        $result = array_merge($result, $flatten_escape($extracted));
-                        continue;
-                    }
+                    // If json_decode fails, it is likely a CSS attribute selector like [class*="ad"]
+                    $result[] = $item;
+                    continue;
                 }
                 if (strpos($item, "\n") !== false) {
                     $lines = explode("\n", $item);

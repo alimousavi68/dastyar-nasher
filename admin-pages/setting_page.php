@@ -678,16 +678,8 @@ function publisher_copoilot_setting_page_callback() {
                                 var parsed = JSON.parse(str);
                                 return flattenJsEscape(parsed);
                             } catch(e) {
-                                // Regex fallback for malformed JSON array string with unescaped quotes
-                                var inner = str.substring(1, str.length - 1).trim();
-                                var matches = inner.match(/"([^"]+)"|'([^']+)'|([^,\s]+)/g);
-                                if (matches && matches.length > 0) {
-                                    $.each(matches, function(idx, m) {
-                                        m = m.trim().replace(/^['"]|['"]$/g, '');
-                                        if (m) res.push(m);
-                                    });
-                                    return res;
-                                }
+                                // If JSON.parse fails, it is likely a CSS attribute selector like [class*="ad"]
+                                return [str];
                             }
                         }
                         if (str.indexOf('\n') !== -1) {
