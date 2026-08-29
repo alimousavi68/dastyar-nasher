@@ -251,16 +251,32 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
         }
 
         // 2. دوم، اعمال Escape Elements (حذف المان‌های ناخواسته از DOM)
-        $escape_selectors = array();
-        if (!empty($escape_elements)) {
-            $decoded = json_decode($escape_elements, true);
-            if (is_array($decoded)) {
-                $escape_selectors = $decoded;
-            } elseif (is_string($escape_elements)) {
-                // backward compat
-                $escape_selectors = array_filter(array_map('trim', explode("\n", $escape_elements)));
+        $flatten_escape = function($input) use (&$flatten_escape) {
+            $result = array();
+            if (empty($input)) return $result;
+            $items = is_array($input) ? $input : array($input);
+            foreach ($items as $item) {
+                if (!is_string($item)) continue;
+                $item = trim($item);
+                if (empty($item)) continue;
+                if (substr($item, 0, 1) === '[' && substr($item, -1) === ']') {
+                    $decoded = json_decode($item, true);
+                    if (is_array($decoded)) {
+                        $result = array_merge($result, $flatten_escape($decoded));
+                        continue;
+                    }
+                }
+                if (strpos($item, "\n") !== false) {
+                    $lines = explode("\n", $item);
+                    $result = array_merge($result, $flatten_escape($lines));
+                    continue;
+                }
+                $result[] = $item;
             }
-        }
+            return array_values(array_unique(array_filter($result)));
+        };
+
+        $escape_selectors = $flatten_escape($escape_elements);
 
         if (!empty($escape_selectors)) {
             $removed_count = 0;

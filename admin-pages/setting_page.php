@@ -663,15 +663,31 @@ function publisher_copoilot_setting_page_callback() {
                 html += renderSelectorRow('بدنه اصلی:', resData.body_selector, bodyIcon);
                 html += renderSelectorRow('تصویر شاخص:', resData.img_selector, imgIcon);
 
-                // Escape elements rendering
-                var escapeElements = [];
-                try {
-                    escapeElements = resData.escape_elements ? JSON.parse(resData.escape_elements) : [];
-                } catch(e) {
-                    if (typeof resData.escape_elements === 'string' && resData.escape_elements.trim() !== '') {
-                        escapeElements = resData.escape_elements.split('\n').map(function(s) { return s.trim(); }).filter(function(s) { return s !== ''; });
+                // Escape elements rendering (with recursive flattening)
+                function flattenJsEscape(input) {
+                    var res = [];
+                    if (!input) return res;
+                    if (typeof input === 'string') {
+                        var str = input.trim();
+                        if (str.startsWith('[') && str.endsWith(']')) {
+                            try {
+                                var parsed = JSON.parse(str);
+                                return flattenJsEscape(parsed);
+                            } catch(e) {}
+                        }
+                        if (str.indexOf('\n') !== -1) {
+                            return flattenJsEscape(str.split('\n'));
+                        }
+                        if (str) res.push(str);
+                    } else if (Array.isArray(input)) {
+                        $.each(input, function(i, item) {
+                            res = res.concat(flattenJsEscape(item));
+                        });
                     }
+                    return res;
                 }
+
+                var escapeElements = flattenJsEscape(resData.escape_elements);
 
                 var escIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>';
                 html += '<div style="display:flex; flex-direction:column; gap:12px;">';
