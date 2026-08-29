@@ -262,15 +262,30 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
                 }
                 if (!is_string($item)) continue;
                 $item = trim($item);
-                $item = trim($item, "'\" \t\n\r\0\x0B");
                 $item = html_entity_decode($item, ENT_QUOTES, 'UTF-8');
                 $item = trim($item, "'\" \t\n\r\0\x0B");
                 if (empty($item)) continue;
                 
-                if ((substr($item, 0, 1) === '[' && substr($item, -1) === ']') || (substr($item, 0, 1) === '{' && substr($item, -1) === '}')) {
+                if (substr($item, 0, 1) === '[' && substr($item, -1) === ']') {
                     $decoded = json_decode($item, true);
                     if (is_array($decoded)) {
                         $result = array_merge($result, $flatten_escape($decoded));
+                        continue;
+                    }
+                    
+                    $inner = trim(substr($item, 1, -1));
+                    preg_match_all('/"(.*?)"|\'(.*?)\'|([^,\s]+)/', $inner, $matches);
+                    $extracted = array();
+                    if (!empty($matches[0])) {
+                        foreach ($matches[0] as $m) {
+                            $m = trim($m, "'\" \t\n\r\0\x0B");
+                            if (!empty($m)) {
+                                $extracted[] = $m;
+                            }
+                        }
+                    }
+                    if (!empty($extracted)) {
+                        $result = array_merge($result, $flatten_escape($extracted));
                         continue;
                     }
                 }

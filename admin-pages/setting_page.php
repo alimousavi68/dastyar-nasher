@@ -663,7 +663,7 @@ function publisher_copoilot_setting_page_callback() {
                 html += renderSelectorRow('بدنه اصلی:', resData.body_selector, bodyIcon);
                 html += renderSelectorRow('تصویر شاخص:', resData.img_selector, imgIcon);
 
-                // Escape elements rendering (with recursive flattening)
+                // Escape elements rendering (with recursive flattening & regex fallback)
                 function flattenJsEscape(input) {
                     var res = [];
                     if (!input) return res;
@@ -677,7 +677,18 @@ function publisher_copoilot_setting_page_callback() {
                             try {
                                 var parsed = JSON.parse(str);
                                 return flattenJsEscape(parsed);
-                            } catch(e) {}
+                            } catch(e) {
+                                // Regex fallback for malformed JSON array string with unescaped quotes
+                                var inner = str.substring(1, str.length - 1).trim();
+                                var matches = inner.match(/"([^"]+)"|'([^']+)'|([^,\s]+)/g);
+                                if (matches && matches.length > 0) {
+                                    $.each(matches, function(idx, m) {
+                                        m = m.trim().replace(/^['"]|['"]$/g, '');
+                                        if (m) res.push(m);
+                                    });
+                                    return res;
+                                }
+                            }
                         }
                         if (str.indexOf('\n') !== -1) {
                             return flattenJsEscape(str.split('\n'));
