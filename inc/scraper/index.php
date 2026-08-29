@@ -271,9 +271,19 @@ function scrape_and_publish_post($guid, $resource_id, $publish_priority)
                 $esc_xpath = dastyar_css_to_xpath($esc_selector);
                 if (empty($esc_xpath)) continue;
                 
+                // اجرای کوئری اصلی و کوئری نسبی جهت اطمینان از یافتن نود در تمام سطوح DOM
                 $esc_nodes = @$xpath->query($esc_xpath);
+                
+                // اگر کوئری اول نود را پیدا نکرد، کوئری Fallback با پشتیبانی از چند کلاس با فاصله‌گذاری اجرا می‌شود
+                if ((!$esc_nodes || $esc_nodes->length === 0) && preg_match('/^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)/', $esc_selector, $matches)) {
+                    $tag = !empty($matches[1]) ? $matches[1] : '*';
+                    $cls = $matches[2];
+                    $fallback_xpath = "//{$tag}[contains(concat(' ', normalize-space(@class), ' '), ' {$cls} ')]";
+                    $esc_nodes = @$xpath->query($fallback_xpath);
+                }
+
                 if ($esc_nodes && $esc_nodes->length > 0) {
-                    // حذف از آخر به اول
+                    // حذف تمام نودهای یافته‌شده و فرزندان آن‌ها از آخر به اول
                     for ($i = $esc_nodes->length - 1; $i >= 0; $i--) {
                         $node = $esc_nodes->item($i);
                         if ($node && $node->parentNode) {
