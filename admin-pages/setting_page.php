@@ -669,6 +669,10 @@ function publisher_copoilot_setting_page_callback() {
                     if (!input) return res;
                     if (typeof input === 'string') {
                         var str = input.trim();
+                        // Strip leading/trailing quotes
+                        if ((str.startsWith("'") && str.endsWith("'")) || (str.startsWith('"') && str.endsWith('"'))) {
+                            str = str.substring(1, str.length - 1).trim();
+                        }
                         if (str.startsWith('[') && str.endsWith(']')) {
                             try {
                                 var parsed = JSON.parse(str);
