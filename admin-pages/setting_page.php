@@ -60,6 +60,15 @@ function publisher_copoilot_setting_page_callback() {
     $interval = ($end_seconds <= $start_seconds) ? (24*3600 - $start_seconds + $end_seconds) : ($end_seconds - $start_seconds);
     $interval_hours = round($interval/3600, 1);
     $post_interval = ($interval_hours > 0 && $daily_post_count > 0) ? round(($interval_hours*60)/$daily_post_count, 1) : 0;
+
+    // دریافت لیست منابع همگام‌سازی شده کلاینت
+    global $wpdb;
+    $resources_table = $wpdb->prefix . 'custom_resource_details';
+    $local_resources = [];
+    if ($wpdb->get_var("SHOW TABLES LIKE '$resources_table'") == $resources_table) {
+        $local_resources = $wpdb->get_results("SELECT * FROM $resources_table", ARRAY_A);
+    }
+    if (!is_array($local_resources)) $local_resources = [];
     ?>
     <link rel="stylesheet" href="<?php echo COP_PLUGIN_URL; ?>/assets/css/feed_list.css">
     <link rel="stylesheet" href="<?php echo COP_PLUGIN_URL; ?>/assets/css/bootstrap.rtl.min.css">
@@ -261,6 +270,16 @@ function publisher_copoilot_setting_page_callback() {
             </div>
 
             <div class="d-flex align-items-center gap-2">
+                <button type="button" onclick="document.getElementById('i8ResourceModal').style.display='flex'" class="btn fw-bold" style="background:#4f46e5; color:#fff; font-size:13px; border-radius:8px; padding:6px 12px; border:none; display:flex; align-items:center; gap:6px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    مشاهده سلکتورهای منابع
+                </button>
                 <?php if ($response == true): ?>
                     <span class="badge-status-published fs-7 px-3 py-2 fw-bold" style="background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0;">لایسنس فعال و معتبر است</span>
                 <?php else: ?>
@@ -559,10 +578,120 @@ function publisher_copoilot_setting_page_callback() {
                 </div>
             </div>
         </form>
+
+        <!-- Modal for Resource Selectors -->
+        <div id="i8ResourceModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:99999; align-items:center; justify-content:center; direction:rtl; backdrop-filter:blur(4px);">
+            <div style="background:#ffffff; width:90%; max-width:650px; border-radius:16px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); overflow:hidden; display:flex; flex-direction:column; max-height:85vh; border:1px solid #e2e8f0;">
+                <div style="padding:16px 24px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:#f8fafc;">
+                    <h3 style="margin:0; font-size:16px; font-weight:700; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                        سلکتورهای ذخیره‌شده کلاینت
+                    </h3>
+                    <button type="button" onclick="document.getElementById('i8ResourceModal').style.display='none'" style="background:#f1f5f9; border:none; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#64748b; transition:all 0.2s;" onmouseover="this.style.background='#e2e8f0';this.style.color='#0f172a'" onmouseout="this.style.background='#f1f5f9';this.style.color='#64748b'">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <div style="padding:24px; overflow-y:auto; flex-grow:1;">
+                    <div style="margin-bottom:24px;">
+                        <label style="display:block; font-size:13px; font-weight:600; margin-bottom:8px; color:#475569;">انتخاب منبع (سایت):</label>
+                        <select id="i8ResourceSelect" style="width:100%; padding:10px 14px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; font-family:tahoma,sans-serif; color:#334155; outline:none; background:#f8fafc; cursor:pointer;">
+                            <option value="">-- یک منبع را انتخاب کنید --</option>
+                        </select>
+                    </div>
+                    <div id="i8ResourceDetails" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:20px;">
+                        <!-- JS renders content here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
     <script>
+        var i8LocalResources = <?php echo json_encode($local_resources, JSON_UNESCAPED_UNICODE); ?>;
+        
         jQuery(document).ready(function($) {
-            // Live Preview Updates logic can be added here if needed
+            var $select = $('#i8ResourceSelect');
+            var $details = $('#i8ResourceDetails');
+
+            // Populate select
+            if (i8LocalResources && i8LocalResources.length > 0) {
+                $.each(i8LocalResources, function(index, res) {
+                    $select.append($('<option>', {
+                        value: res.resource_id,
+                        text: res.resource_title || ('منبع #' + res.resource_id)
+                    }));
+                });
+            } else {
+                $select.html('<option value="">-- هیچ منبعی در دیتابیس کلاینت یافت نشد --</option>');
+            }
+
+            // Handle selection
+            $select.on('change', function() {
+                var resId = $(this).val();
+                if (!resId) {
+                    $details.hide();
+                    return;
+                }
+
+                var resData = i8LocalResources.find(function(r) { return r.resource_id == resId; });
+                if (!resData) return;
+
+                var html = '<div style="display:flex; flex-direction:column; gap:16px;">';
+                
+                // Helper to render simple selector row
+                function renderSelectorRow(label, selector, icon) {
+                    var val = selector ? selector : '<span style="color:#94a3b8;font-size:12px;">خالی</span>';
+                    var codeStyle = selector ? 'background:#fff; border:1px solid #cbd5e1; color:#0f172a; padding:4px 8px; border-radius:6px; font-family:monospace; font-size:12px; direction:ltr; display:inline-block;' : '';
+                    return '<div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:12px; border-bottom:1px solid #e2e8f0;">' +
+                           '<div style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:#475569;">' + icon + label + '</div>' +
+                           '<div style="' + codeStyle + '">' + escapeHtmlAttr(val) + '</div>' +
+                           '</div>';
+                }
+
+                function escapeHtmlAttr(str) {
+                    if (str === null || str === undefined) return '';
+                    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                }
+
+                var titleIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16"/><path d="M4 15h16"/><path d="M10 3L8 21"/><path d="M16 3l-2 18"/></svg>';
+                var leadIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>';
+                var bodyIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>';
+                var imgIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+
+                html += renderSelectorRow('عنوان:', resData.title_selector, titleIcon);
+                html += renderSelectorRow('لید:', resData.lead_selector, leadIcon);
+                html += renderSelectorRow('بدنه اصلی:', resData.body_selector, bodyIcon);
+                html += renderSelectorRow('تصویر شاخص:', resData.img_selector, imgIcon);
+
+                // Escape elements rendering
+                var escapeElements = [];
+                try {
+                    escapeElements = resData.escape_elements ? JSON.parse(resData.escape_elements) : [];
+                } catch(e) {
+                    if (typeof resData.escape_elements === 'string' && resData.escape_elements.trim() !== '') {
+                        escapeElements = resData.escape_elements.split('\n').map(function(s) { return s.trim(); }).filter(function(s) { return s !== ''; });
+                    }
+                }
+
+                var escIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>';
+                html += '<div style="display:flex; flex-direction:column; gap:12px;">';
+                html += '<div style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:#475569;">' + escIcon + 'المان‌های حذف‌شونده:</div>';
+                
+                if (escapeElements && escapeElements.length > 0) {
+                    html += '<div style="display:flex; flex-wrap:wrap; gap:8px; direction:ltr; justify-content:flex-end;">';
+                    $.each(escapeElements, function(i, esc) {
+                        html += '<span style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; padding:4px 10px; border-radius:20px; font-size:11.5px; font-family:monospace; display:inline-block;">' + escapeHtmlAttr(esc) + '</span>';
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<div style="text-align:left; color:#94a3b8; font-size:12px;">ندارد</div>';
+                }
+                html += '</div>'; // end escape block
+                
+                html += '</div>'; // end container
+                
+                $details.html(html).fadeIn(200);
+            });
         });
     </script>
 <?php
